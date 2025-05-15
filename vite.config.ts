@@ -34,8 +34,8 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === 'development',
     rollupOptions: {
       input: {
-        background: resolve(__dirname, 'src/background.ts'),
-        content: resolve(__dirname, 'src/content.tsx'),
+        // background: resolve(__dirname, 'src/background.ts'),
+        // content: resolve(__dirname, 'src/content.tsx'),
         popup: resolve(__dirname, 'src/popup/index.html'),
         options: resolve(__dirname, 'src/options/index.html')
       },

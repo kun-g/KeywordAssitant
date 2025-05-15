@@ -132,7 +132,6 @@ const Popup = () => {
     <div className="w-96 p-4">
       <header className="mb-4">
         <h1 className="text-xl font-bold">LinkPilot</h1>
-        <p className="text-sm text-gray-500">外链管理工具</p>
       </header>
 
       {/* 选项卡 */}

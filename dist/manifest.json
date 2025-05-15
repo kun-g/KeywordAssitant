@@ -26,11 +26,11 @@
   },
   "content_scripts": [
     {
-      "js": [
-        "assets/content.tsx-loader-DxTGE1Y3.js"
-      ],
       "matches": [
         "<all_urls>"
+      ],
+      "js": [
+        "src/content.tsx-loader.js"
       ]
     }
   ],
@@ -49,8 +49,8 @@
         "<all_urls>"
       ],
       "resources": [
-        "assets/client-BDSzbp7x.js",
-        "assets/content.js"
+        "**/*",
+        "*"
       ],
       "use_dynamic_url": false
     }
