@@ -1,7 +1,7 @@
 import { useState, useEffect, StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import '../styles/globals.css';
-import { PlatformType, KeywordData } from '../types';
+import { PlatformType, KeywordData } from '../types/index';
 
 const Popup = () => {
   const [platform, setPlatform] = useState<PlatformType | null>(null);
@@ -251,46 +251,78 @@ const Popup = () => {
                 </div>
               )}
               
-              {keywordData.serp && (
+              {/* 动态趋势图表 */}
+              {keywordData.trends && keywordData.trends.chartUrl && (
                 <div className="mt-3">
-                  <h3 className="font-medium mb-1">SERP组成</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col">
-                      <span className="text-gray-600">自然结果：</span>
-                      <span className="font-medium">{formatValue(keywordData.serp.organic)}</span>
+                  <h3 className="font-medium mb-1">动态趋势</h3>
+                  <div className="flex flex-col">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-gray-600">当前：{formatValue(keywordData.trends.current)}</span>
+                      <span className="text-gray-600">变化：{formatValue(keywordData.trends.change)}</span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-gray-600">特性结果：</span>
-                      <span className="font-medium">{formatValue(keywordData.serp.features)}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-gray-600">广告：</span>
-                      <span className="font-medium">{formatValue(keywordData.serp.ads)}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-gray-600">PLA：</span>
-                      <span className="font-medium">{formatValue(keywordData.serp.pla)}</span>
-                    </div>
+                    <img 
+                      src={keywordData.trends.chartUrl} 
+                      alt="趋势图" 
+                      className="w-full border border-gray-200 rounded"
+                    />
                   </div>
                 </div>
               )}
               
+              {/* 头部网站 */}
+              {keywordData.topCompetitors && keywordData.topCompetitors.length > 0 && (
+                <div className="mt-3">
+                  <h3 className="font-medium mb-1">头部网站</h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">网站</th>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">点击量</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {keywordData.topCompetitors.map((competitor, index) => (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="text-xs p-2 border border-gray-200">{competitor.website}</td>
+                            <td className="text-xs p-2 border border-gray-200">{competitor.clicks}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {/* 相关关键词（带数据） */}
               {keywordData.relatedKeywords && keywordData.relatedKeywords.length > 0 && (
                 <div className="mt-3">
                   <h3 className="font-medium mb-1">相关关键词</h3>
-                  <div className="flex flex-wrap gap-1">
-                    {keywordData.relatedKeywords.slice(0, 5).map((relatedKeyword, index) => (
-                      <span 
-                        key={index}
-                        className="bg-gray-100 px-2 py-1 rounded text-xs"
-                      >
-                        {relatedKeyword}
-                      </span>
-                    ))}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">关键词</th>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">搜索量</th>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">点击量</th>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">KD</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {keywordData.relatedKeywords.slice(0, 5).map((relatedKeyword, index) => (
+                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="text-xs p-2 border border-gray-200">{relatedKeyword.keyword}</td>
+                            <td className="text-xs p-2 border border-gray-200">{relatedKeyword.volume}</td>
+                            <td className="text-xs p-2 border border-gray-200">{relatedKeyword.clicks}</td>
+                            <td className="text-xs p-2 border border-gray-200">{relatedKeyword.kd}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                     {keywordData.relatedKeywords.length > 5 && (
-                      <span className="text-xs text-gray-500">
-                        等 {keywordData.relatedKeywords.length} 个相关词
-                      </span>
+                      <div className="text-xs text-gray-500 mt-1">
+                        显示前5个，共 {keywordData.relatedKeywords.length} 个相关词
+                      </div>
                     )}
                   </div>
                 </div>

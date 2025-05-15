@@ -38,9 +38,22 @@ export interface KeywordData {
     desktop?: string | number;
     mobile?: string | number;
   };
-  trends?: any;
+  trends?: {
+    current: string;
+    change: string;
+    chartUrl: string;
+  };
   difficulty?: string | number;
-  relatedKeywords?: string[];
+  relatedKeywords?: Array<{
+    keyword: string;
+    volume: string;
+    clicks: string;
+    kd: string;
+  }>;
+  topCompetitors?: Array<{
+    website: string;
+    clicks: string;
+  }>;
   captured_at?: number;
   source_url?: string;
 }

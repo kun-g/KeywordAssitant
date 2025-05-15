@@ -1,7 +1,7 @@
 // KeywordAssistant - 内容脚本
 // 负责在目标外链页面执行评论提交操作
 
-import { MessagePayload } from './types';
+import { MessagePayload } from './types/index';
 
 // React导入放在条件语句外，确保编译时可用
 // React自动导入by jsxInject
@@ -52,6 +52,72 @@ const fetchKeywordData = async (): Promise<any> => {
       const volumeClicksContainer = document.querySelector('div[data-automation="VolumeAndClicks"] > div');
       const dataValueElements = volumeClicksContainer?.querySelectorAll('div[class*="DataValue-"]');
       
+      // 获取设备分布数据
+      const deviceDistributionContainer = document.querySelector('div[data-automation="DeviceDistribution"]');
+      const deviceLabels = deviceDistributionContainer?.querySelectorAll('div[data-automation="non-selectable-legend-label-value"]');
+      
+      // 获取动态趋势图表
+      const trendOverTimeContainer = document.querySelector('div[class*="TrendOverTimeWrapper"]');
+      const trendChart = trendOverTimeContainer?.querySelector('svg.highcharts-root');
+      let trendChartUrl = '';
+      
+      if (trendChart) {
+        try {
+          // 将SVG转换为Data URL
+          const svgData = new XMLSerializer().serializeToString(trendChart);
+          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+          trendChartUrl = URL.createObjectURL(svgBlob);
+        } catch (e) {
+          console.error('无法创建趋势图URL:', e);
+        }
+      }
+      
+      // 获取相关关键词
+      const keywordsIdeasContainer = document.querySelector('div[data-automation="KeywordsIdeas"]');
+      let relatedKeywords: Array<{keyword: string, volume: string, clicks: string, kd: string}> = [];
+      
+      if (keywordsIdeasContainer) {
+        // 找到关键词表格
+        const keywordRows = keywordsIdeasContainer.querySelectorAll('tr');
+        
+        // 跳过表头行，处理每一行数据
+        for (let i = 1; i < keywordRows.length; i++) {
+          const row = keywordRows[i];
+          const cells = row.querySelectorAll('td');
+          
+          if (cells.length >= 4) {
+            relatedKeywords.push({
+              keyword: cells[0]?.textContent?.trim() || '未知',
+              volume: cells[1]?.textContent?.trim() || '未知',
+              clicks: cells[2]?.textContent?.trim() || '未知',
+              kd: cells[3]?.textContent?.trim() || '未知'
+            });
+          }
+        }
+      }
+      
+      // 获取头部网站数据
+      const topCompetitorsContainer = document.querySelector('div[data-automation="TopCompetitors"]');
+      let topCompetitors: Array<{website: string, clicks: string}> = [];
+      
+      if (topCompetitorsContainer) {
+        // 找到头部网站表格
+        const competitorRows = topCompetitorsContainer.querySelectorAll('tr');
+        
+        // 跳过表头行，处理每一行数据
+        for (let i = 1; i < competitorRows.length; i++) {
+          const row = competitorRows[i];
+          const cells = row.querySelectorAll('td');
+          
+          if (cells.length >= 2) {
+            topCompetitors.push({
+              website: cells[0]?.textContent?.trim() || '未知',
+              clicks: cells[1]?.textContent?.trim() || '未知'
+            });
+          }
+        }
+      }
+      
       // 从页面上提取数据
       const dataPoints = {
         keyword,
@@ -59,60 +125,31 @@ const fetchKeywordData = async (): Promise<any> => {
         volume: dataValueElements?.[0]?.textContent?.trim() || '未知',
         clicks: dataValueElements?.[1]?.textContent?.trim() || '未知',
         clickThroughRate: dataValueElements?.[2]?.textContent?.trim() || '未知',
-        
-        // SERP组成信息
-        serp: {
-          organic: parseFloat(document.querySelector('[title*="Classic Organic"] + div')?.textContent?.trim() || '0'),
-          features: parseFloat(document.querySelector('[title*="自然 SERP 特性"] + div')?.textContent?.trim() || '0'),
-          ads: parseFloat(document.querySelector('[title*="文本广告"] + div')?.textContent?.trim() || '0'),
-          pla: parseFloat(document.querySelector('[title*="PLA"] + div')?.textContent?.trim() || '0')
-        },
-        
+        difficulty: document.querySelector('[id*="难度"] + div')?.textContent?.trim() || '未知',
         // 设备分布
         devices: {
-          desktop: document.querySelector('[title*="桌面端"] + div')?.textContent?.trim() || '0%',
-          mobile: document.querySelector('[title*="移动网络"] + div')?.textContent?.trim() || '0%'
+          desktop: deviceLabels?.[0]?.textContent?.trim() || '未知',
+          mobile: deviceLabels?.[1]?.textContent?.trim() || '未知'
         },
-        
-        // 趋势数据 - 这通常需要更复杂的方法来获取图表数据
-        // 这里仅简单获取显示的数字
+        // 动态趋势
         trends: {
-          current: document.querySelector('[id*="规模_trend"] .current')?.textContent?.trim() || '未知',
-          change: document.querySelector('[id*="规模_trend"] .change')?.textContent?.trim() || '未知'
+          current: document.querySelector('[id*="当前"] + div')?.textContent?.trim() || '未知',
+          change: document.querySelector('[id*="变化"] + div')?.textContent?.trim() || '未知',
+          chartUrl: trendChartUrl
         },
-        
         // 相关关键词
-        relatedKeywords: Array.from(
-          document.querySelectorAll('[id*="keywordIdeas"] tr td:first-child a')
-        ).map(el => (el as HTMLElement).textContent?.trim() || '')
+        relatedKeywords,
+        // 头部网站
+        topCompetitors
       };
-
-      // 发送数据到背景脚本存储
-      chrome.runtime.sendMessage({
-        action: 'keyword_data_fetched',
-        data: dataPoints
-      });
-
+      
       return dataPoints;
-    } 
-    // 针对其他平台，可以在这里扩展不同平台的数据抓取逻辑
-    else {
-      const dummyData = {
-        keyword: '示例关键词',
-        volume: '测试数据',
-        platform: detectPlatform()
-      };
-      
-      // 发送数据到背景脚本存储
-      chrome.runtime.sendMessage({
-        action: 'keyword_data_fetched',
-        data: dummyData
-      });
-      
-      return dummyData;
     }
+    
+    // 其他平台
+    return { message: '当前仅支持Sim3ue平台' };
   } catch (error) {
-    console.error('KeywordAssistant: 获取关键词数据失败', error);
+    console.error('抓取关键词数据时出错:', error);
     throw error;
   }
 };
