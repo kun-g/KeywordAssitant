@@ -6,12 +6,12 @@
    **描述**: 当前文档，提供 `docs` 目录的文档列表及说明。
 
 2. [roadmap.md](roadmap.md)  
-   **描述**: LinkPilot 插件 Roadmap 及迭代节奏规划，分阶段描述产品演进目标与核心交付内容。
+   **描述**: KeywordAssistant 插件 Roadmap 及迭代节奏规划，分阶段描述产品演进目标与核心交付内容。
 
 3. [error-handling.md](error-handling.md)  
    **描述**: 错误与异常处理机制文档，涵盖错误分类、处理策略、用户提示与日志记录等。
 
-4. [user-guide](user-guide)  
+4. [user-guide](user-guide.md)
    **描述**: 用户使用手册与内部测试指南，包含安装、配置、功能操作与测试用例清单。
 
 5. [api.md](api.md)  

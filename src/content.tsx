@@ -1,4 +1,4 @@
-// LinkPilot - 内容脚本
+// KeywordAssistant - 内容脚本
 // 负责在目标外链页面执行评论提交操作
 
 import { MessagePayload } from './types';
@@ -7,138 +7,172 @@ import { MessagePayload } from './types';
 // React自动导入by jsxInject
 import ReactDOM from 'react-dom/client';
 
-// 开发环境变量
-const isDevelopment = false; // 构建时会被替换
-
 // 判断页面平台类型
 function detectPlatform() {
   const html = document.documentElement.innerHTML;
-  if (html.includes('wp-content') || html.includes('wordpress')) {
-    return 'wordpress';
-  } else if (html.includes('disqus')) {
-    return 'disqus';
+  if (window.location.hostname.includes('ahrefs')) {
+    return 'ahrefs';
+  } else if (window.location.hostname.includes('sim.3ue.co')) {
+    return 'sim3ue';
   } else {
     return 'unknown';
   }
 }
 
-// 查找评论表单
-const findCommentForm = (): HTMLFormElement | null => {
-  const platform = detectPlatform();
-
-  if (platform === 'wordpress') {
-    return document.getElementById('commentform') as HTMLFormElement;
-  } else if (platform === 'disqus') {
-    return document.querySelector('.textarea-wrapper') as HTMLFormElement;
-  } else {
-    // 尝试通用评论表单识别
-    const forms = Array.from(document.querySelectorAll('form'));
-    return forms.find(form => {
-      const text = form.textContent?.toLowerCase() || '';
-      return (
-        text.includes('comment') || 
-        text.includes('留言') || 
-        text.includes('评论')
-      );
-    }) || null;
+// 从URL中提取关键词
+const extractKeywordFromUrl = (): string | null => {
+  try {
+    const url = new URL(window.location.href);
+    if (url.hash.includes('keyword=')) {
+      // 从URL hash部分提取关键词参数
+      const keywordMatch = url.hash.match(/keyword=([^&]+)/);
+      if (keywordMatch && keywordMatch[1]) {
+        // 解码URL编码的关键词
+        return decodeURIComponent(keywordMatch[1]);
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('KeywordAssistant: 解析URL失败', error);
+    return null;
   }
 };
 
-// 填写并提交评论
-const submitComment = async (id: string, comment: string): Promise<{ success: boolean; error?: string }> => {
+// 抓取页面上的关键词数据
+const fetchKeywordData = async (): Promise<any> => {
   try {
-    const form = findCommentForm();
-    
-    if (!form) {
-      return { 
-        success: false, 
-        error: '无法找到评论表单' 
-      };
-    }
-
-    const platform = detectPlatform();
-    let commentField: HTMLTextAreaElement | HTMLInputElement | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let submitButton: HTMLButtonElement | HTMLInputElement | null = null;
-
-    // 查找评论字段和提交按钮
-    if (platform === 'wordpress') {
-      commentField = document.getElementById('comment') as HTMLTextAreaElement;
-      submitButton = form.querySelector('input[type="submit"]') as HTMLInputElement;
-    } else if (platform === 'disqus') {
-      commentField = document.querySelector('.textarea') as HTMLTextAreaElement;
-      submitButton = document.querySelector('.btn-primary') as HTMLButtonElement;
-    } else {
-      // 通用表单识别
-      commentField = form.querySelector('textarea') as HTMLTextAreaElement;
-      submitButton = form.querySelector('button[type="submit"], input[type="submit"]') as HTMLButtonElement;
-    }
-
-    if (!commentField) {
-      return { 
-        success: false, 
-        error: '无法找到评论输入框' 
-      };
-    }
-
-    // 使用事件模拟用户输入
-    const setNativeValue = (element: HTMLTextAreaElement | HTMLInputElement, value: string) => {
-      const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
-      const prototype = Object.getPrototypeOf(element);
-      const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
-      
-      if (valueSetter && prototypeValueSetter && valueSetter !== prototypeValueSetter) {
-        prototypeValueSetter.call(element, value);
-      } else {
-        valueSetter?.call(element, value);
+    // 针对sim3ue平台
+    if (detectPlatform() === 'sim3ue') {
+      const keyword = extractKeywordFromUrl();
+      if (!keyword) {
+        throw new Error('无法从URL中提取关键词');
       }
+
+      // 使用可靠的DataValue-类选择器获取数据
+      const volumeClicksContainer = document.querySelector('div[data-automation="VolumeAndClicks"] > div');
+      const dataValueElements = volumeClicksContainer?.querySelectorAll('div[class*="DataValue-"]');
       
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-    };
-
-    // 填写评论
-    setNativeValue(commentField, comment);
-    
-    // 在真实提交前，先通知Background评论已提交状态
-    // 注意：这里不实际提交，仅演示通信流程
-    chrome.runtime.sendMessage({
-      action: 'link_submitted',
-      data: {
-        id: id,
-        success: true
-      }
-    });
-
-    console.log('LinkPilot: 评论已填写，等待用户确认');
-    
-    // 不自动点击提交按钮，避免自动化提交被反垃圾评论系统拦截
-    // 如果需要自动提交，可以取消下面注释
-    /*
-    if (submitButton) {
-      submitButton.click();
-      return { success: true };
-    } else {
-      return { 
-        success: false, 
-        error: '无法找到提交按钮' 
+      // 从页面上提取数据
+      const dataPoints = {
+        keyword,
+        // 使用DataValue-类选择器获取volume、clicks和clickThroughRate
+        volume: dataValueElements?.[0]?.textContent?.trim() || '未知',
+        clicks: dataValueElements?.[1]?.textContent?.trim() || '未知',
+        clickThroughRate: dataValueElements?.[2]?.textContent?.trim() || '未知',
+        
+        // SERP组成信息
+        serp: {
+          organic: parseFloat(document.querySelector('[title*="Classic Organic"] + div')?.textContent?.trim() || '0'),
+          features: parseFloat(document.querySelector('[title*="自然 SERP 特性"] + div')?.textContent?.trim() || '0'),
+          ads: parseFloat(document.querySelector('[title*="文本广告"] + div')?.textContent?.trim() || '0'),
+          pla: parseFloat(document.querySelector('[title*="PLA"] + div')?.textContent?.trim() || '0')
+        },
+        
+        // 设备分布
+        devices: {
+          desktop: document.querySelector('[title*="桌面端"] + div')?.textContent?.trim() || '0%',
+          mobile: document.querySelector('[title*="移动网络"] + div')?.textContent?.trim() || '0%'
+        },
+        
+        // 趋势数据 - 这通常需要更复杂的方法来获取图表数据
+        // 这里仅简单获取显示的数字
+        trends: {
+          current: document.querySelector('[id*="规模_trend"] .current')?.textContent?.trim() || '未知',
+          change: document.querySelector('[id*="规模_trend"] .change')?.textContent?.trim() || '未知'
+        },
+        
+        // 相关关键词
+        relatedKeywords: Array.from(
+          document.querySelectorAll('[id*="keywordIdeas"] tr td:first-child a')
+        ).map(el => (el as HTMLElement).textContent?.trim() || '')
       };
+
+      // 发送数据到背景脚本存储
+      chrome.runtime.sendMessage({
+        action: 'keyword_data_fetched',
+        data: dataPoints
+      });
+
+      return dataPoints;
+    } 
+    // 针对其他平台，可以在这里扩展不同平台的数据抓取逻辑
+    else {
+      const dummyData = {
+        keyword: '示例关键词',
+        volume: '测试数据',
+        platform: detectPlatform()
+      };
+      
+      // 发送数据到背景脚本存储
+      chrome.runtime.sendMessage({
+        action: 'keyword_data_fetched',
+        data: dummyData
+      });
+      
+      return dummyData;
     }
-    */
-    
-    return { success: true };
   } catch (error) {
-    console.error('LinkPilot: 提交评论失败', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : '未知错误' 
-    };
+    console.error('KeywordAssistant: 获取关键词数据失败', error);
+    throw error;
   }
+};
+
+// 渲染关键词抓取按钮
+const renderKeywordFetchButton = () => {
+  // 移除已存在的按钮（如果有）
+  const existingContainer = document.getElementById('KeywordAssistant-keyword-container');
+  if (existingContainer) {
+    existingContainer.remove();
+  }
+  
+  const container = document.createElement('div');
+  container.id = 'KeywordAssistant-keyword-container';
+  document.body.appendChild(container);
+  
+  const keyword = extractKeywordFromUrl() || '页面数据';
+  const platform = detectPlatform();
+  
+  const root = ReactDOM.createRoot(container);
+  root.render(
+    <div 
+      style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 9999,
+        padding: '10px 15px',
+        background: '#0079fb',
+        color: 'white',
+        borderRadius: '5px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+        fontSize: '14px',
+        fontWeight: 'bold'
+      }}
+      onClick={() => {
+        fetchKeywordData()
+          .then(data => {
+            alert(`数据已抓取成功！平台: ${platform}`);
+            console.log('抓取的数据:', data);
+          })
+          .catch(err => {
+            alert(`抓取失败: ${err.message}`);
+          });
+      }}
+      title="抓取页面数据"
+    >
+      抓取{keyword !== '页面数据' ? `"${keyword}"` : '页面'}数据
+    </div>
+  );
 };
 
 // 注入UI组件
 const injectUI = () => {
   const container = document.createElement('div');
-  container.id = 'linkpilot-container';
+  container.id = 'KeywordAssistant-container';
   document.body.appendChild(container);
   
   const root = ReactDOM.createRoot(container);
@@ -161,16 +195,17 @@ const injectUI = () => {
         cursor: 'pointer',
         boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
       }}
-      title="LinkPilot已加载"
+      title="KeywordAssistant已加载"
+      onClick={() => renderKeywordFetchButton()}
     >
-      LP
+      KA
     </div>
   );
 };
 
 // 监听来自Background的消息
 chrome.runtime.onMessage.addListener((message: MessagePayload, _sender, sendResponse) => {
-  console.log('LinkPilot Content Script: 接收到消息', message);
+  console.log('KeywordAssistant Content Script: 接收到消息', message);
 
   if (message.action === 'submit_comment') {
     // 简化版本，仅用于开发测试
@@ -185,17 +220,66 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, _sender, sendResp
     sendResponse({ success: true });
     return true; // 指示异步响应
   }
+  
+  if (message.action === 'get_platform') {
+    // 返回当前检测到的平台类型
+    const platform = detectPlatform();
+    console.log('KeywordAssistant: 检测到平台类型:', platform);
+    sendResponse({ 
+      success: true, 
+      platform 
+    });
+    return true; // 指示异步响应
+  }
+  
+  if (message.action === 'get_keyword') {
+    // 返回从URL提取的关键词
+    const keyword = extractKeywordFromUrl();
+    console.log('KeywordAssistant: 提取到关键词:', keyword);
+    sendResponse({ 
+      success: true, 
+      keyword 
+    });
+    return true; // 指示异步响应
+  }
+  
+  if (message.action === 'fetch_keyword_data') {
+    // 执行关键词数据抓取
+    fetchKeywordData()
+      .then(data => {
+        console.log('KeywordAssistant: 关键词数据抓取成功:', data);
+        sendResponse({ 
+          success: true, 
+          data 
+        });
+      })
+      .catch(error => {
+        console.error('KeywordAssistant: 关键词数据抓取失败:', error);
+        sendResponse({ 
+          success: false, 
+          error: error.message || '抓取失败' 
+        });
+      });
+    return true; // 指示异步响应
+  }
 });
 
 // 页面加载完成后执行
 window.addEventListener('load', () => {
-  console.log('LinkPilot 内容脚本已加载, 平台类型:', detectPlatform());
+  console.log('KeywordAssistant 内容脚本已加载, 平台类型:', detectPlatform());
   
-  // 添加可视化标记（开发模式下）
-  // @ts-ignore - 这是从vite.config.ts中define注入的全局变量
-  if (typeof isDevelopment !== 'undefined' && isDevelopment) {
-    console.log('LinkPilot: 开发模式下启动');
-    injectUI();
+  // 添加可视化标记和抓取按钮
+  console.log('KeywordAssistant: 注入UI组件');
+  injectUI();
+  
+  // 如果是Sim3ue平台，自动显示关键词抓取按钮
+  if (detectPlatform() === 'sim3ue') {
+    console.log('KeywordAssistant: 检测到Sim3ue平台，尝试提取关键词');
+    const keyword = extractKeywordFromUrl();
+    if (keyword) {
+      console.log('KeywordAssistant: 检测到关键词:', keyword);
+      renderKeywordFetchButton();
+    }
   }
 });
 

@@ -1,10 +1,10 @@
-# LinkPilot 插件 API / 模块接口说明文档
+# KeywordAssistant 插件 API / 模块接口说明文档
 
 ---
 
 ## 一、说明
 
-本文件定义 LinkPilot 插件内部的主要模块接口，涵盖：
+本文件定义 KeywordAssistant 插件内部的主要模块接口，涵盖：
 
 * 数据处理模块
 * 任务调度模块
@@ -122,7 +122,7 @@ chrome.scripting.executeScript({
 
 ```ts
 window.postMessage({
-  type: 'linkpilot_submission_result',
+  type: 'KeywordAssistant_submission_result',
   payload: {
     id: backlinkId,
     success: true,

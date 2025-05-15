@@ -88,7 +88,7 @@ const Options = () => {
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6">LinkPilot 设置</h1>
+      <h1 className="text-2xl font-bold mb-6">KeywordAssistant 设置</h1>
       
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold mb-4">站点信息配置</h2>

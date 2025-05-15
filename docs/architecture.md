@@ -1,10 +1,10 @@
-# LinkPilot 插件系统架构说明文档
+# KeywordAssistant 插件系统架构说明文档
 
 ---
 
 ## 一、总体架构概览
 
-LinkPilot 插件基于 Chrome MV3 插件架构开发，主要由以下五个逻辑模块组成：
+KeywordAssistant 插件基于 Chrome MV3 插件架构开发，主要由以下五个逻辑模块组成：
 
 ```plaintext
 ┌───────────────────────────────┐

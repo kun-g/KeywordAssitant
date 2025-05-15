@@ -1,10 +1,10 @@
-# LinkPilot 插件页面结构设计文档
+# KeywordAssistant 插件页面结构设计文档
 
 ---
 
 ## 一、页面总览
 
-LinkPilot 插件包含以下三大交互界面：
+KeywordAssistant 插件包含以下三大交互界面：
 
 * 插件主界面（Popup）：执行采集、提交操作的主要入口
 * 设置页面（Options）：配置站点信息、模型偏好与权限信息

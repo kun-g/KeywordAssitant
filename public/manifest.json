@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LinkPilot",
+  "name": "KeywordAssistant",
   "version": "0.1.0",
   "description": "外链收集、管理与提交的Chrome浏览器扩展",
   "action": {

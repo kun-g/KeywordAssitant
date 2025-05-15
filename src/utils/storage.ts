@@ -1,8 +1,8 @@
 /**
- * LinkPilot 存储工具函数
+ * KeywordAssistant 存储工具函数
  */
 
-import { Backlink, SiteConfig, LinkPilotStorage } from '../types';
+import { Backlink, SiteConfig, KeywordAssistantStorage } from '../types';
 
 /**
  * 获取所有外链数据
@@ -143,9 +143,9 @@ export const saveSiteConfig = async (config: SiteConfig): Promise<boolean> => {
 
 /**
  * 导出所有数据
- * @returns Promise<LinkPilotStorage>
+ * @returns Promise<KeywordAssistantStorage>
  */
-export const exportAllData = async (): Promise<LinkPilotStorage> => {
+export const exportAllData = async (): Promise<KeywordAssistantStorage> => {
   try {
     const backlinks = await getBacklinks();
     const site_config = await getSiteConfig();

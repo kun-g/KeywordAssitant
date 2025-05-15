@@ -1,4 +1,4 @@
-# LinkPilot 插件用户使用手册 / 内部测试指南
+# KeywordAssistant 插件用户使用手册 / 内部测试指南
 
 ---
 

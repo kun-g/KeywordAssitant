@@ -1,10 +1,10 @@
-// LinkPilot插件类型定义
+// KeywordAssistant插件类型定义
 
 export type LinkStatus = 'pending' | 'submitted' | 'success' | 'failed' | 'ignored';
 
 export type LinkType = 'blog' | 'forum' | 'directory' | 'paid' | 'other';
 
-export type PlatformType = 'wordpress' | 'disqus' | 'custom' | 'unknown';
+export type PlatformType = 'ahrefs' | 'custom' | 'unknown' | 'sim3ue';
 
 export interface Backlink {
   id: string;
@@ -23,6 +23,28 @@ export interface Backlink {
   updated_at: number;
 }
 
+export interface KeywordData {
+  keyword: string;
+  volume?: string | number;
+  clicks?: string | number;
+  clickThroughRate?: string | number;
+  serp?: {
+    organic?: number;
+    features?: number;
+    ads?: number;
+    pla?: number;
+  };
+  devices?: {
+    desktop?: string | number;
+    mobile?: string | number;
+  };
+  trends?: any;
+  difficulty?: string | number;
+  relatedKeywords?: string[];
+  captured_at?: number;
+  source_url?: string;
+}
+
 export interface SiteConfig {
   name: string;
   domain: string;
@@ -30,14 +52,20 @@ export interface SiteConfig {
   industry: string;
 }
 
-export interface LinkPilotStorage {
+export interface KeywordAssistantStorage {
   backlinks: Backlink[];
   site_config: SiteConfig;
+  keywords?: KeywordData[];
 }
 
 export interface MessagePayload {
   action: string;
   data: any;
+}
+
+export interface KeywordDataFetchedMessage extends MessagePayload {
+  action: 'keyword_data_fetched';
+  data: KeywordData;
 }
 
 export interface SubmitLinkRequest {

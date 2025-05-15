@@ -1,10 +1,10 @@
-# LinkPilot
+# KeywordAssistant
 
 外链收集、管理与提交的Chrome浏览器扩展
 
 ## 功能概述
 
-LinkPilot是一个强大的Chrome扩展，帮助用户高效管理外部链接，主要包含以下核心功能：
+KeywordAssistant是一个强大的Chrome扩展，帮助用户高效管理外部链接，主要包含以下核心功能：
 
 1. **外链收集**：自动从Ahrefs或任意网页抓取外链，支持CSV导入
 2. **外链管理**：标记、分类、筛选和搜索你的外链
