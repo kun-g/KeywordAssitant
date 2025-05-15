@@ -1,0 +1,22 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+USE Vite + React + crxjs
+
+Project Structure:
+
+my-extension/
+├── src/
+│   ├── background.ts
+│   ├── content.tsx
+│   ├── popup/
+│   │   └── Popup.tsx
+│   ├── assets/
+│   └── styles/
+├── public/
+│   └── manifest.json
+├── vite.config.ts
+├── package.json
+└── tsconfig.json
