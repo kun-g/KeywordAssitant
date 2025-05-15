@@ -47,7 +47,7 @@ export interface KeywordData {
   relatedKeywords?: Array<{
     keyword: string;
     volume: string;
-    clicks: string;
+    clickThroughRate: string;
     kd: string;
   }>;
   topCompetitors?: Array<{

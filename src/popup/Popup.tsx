@@ -256,10 +256,6 @@ const Popup = () => {
                 <div className="mt-3">
                   <h3 className="font-medium mb-1">动态趋势</h3>
                   <div className="flex flex-col">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-gray-600">当前：{formatValue(keywordData.trends.current)}</span>
-                      <span className="text-gray-600">变化：{formatValue(keywordData.trends.change)}</span>
-                    </div>
                     <img 
                       src={keywordData.trends.chartUrl} 
                       alt="趋势图" 
@@ -304,7 +300,7 @@ const Popup = () => {
                         <tr>
                           <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">关键词</th>
                           <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">搜索量</th>
-                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">点击量</th>
+                          <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">零点击率</th>
                           <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">KD</th>
                         </tr>
                       </thead>
@@ -313,7 +309,7 @@ const Popup = () => {
                           <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                             <td className="text-xs p-2 border border-gray-200">{relatedKeyword.keyword}</td>
                             <td className="text-xs p-2 border border-gray-200">{relatedKeyword.volume}</td>
-                            <td className="text-xs p-2 border border-gray-200">{relatedKeyword.clicks}</td>
+                            <td className="text-xs p-2 border border-gray-200">{relatedKeyword.clickThroughRate}</td>
                             <td className="text-xs p-2 border border-gray-200">{relatedKeyword.kd}</td>
                           </tr>
                         ))}

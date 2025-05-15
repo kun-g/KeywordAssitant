@@ -77,23 +77,34 @@ const fetchKeywordData = async (): Promise<any> => {
       let relatedKeywords: Array<{keyword: string, volume: string, clicks: string, kd: string}> = [];
       
       if (keywordsIdeasContainer) {
-        // 找到关键词表格
-        const keywordRows = keywordsIdeasContainer.querySelectorAll('tr');
+        const keywordCells = keywordsIdeasContainer.querySelectorAll('[data-table-row][data-table-col]');
+        const rowMap = new Map<number, any>();
         
-        // 跳过表头行，处理每一行数据
-        for (let i = 1; i < keywordRows.length; i++) {
-          const row = keywordRows[i];
-          const cells = row.querySelectorAll('td');
-          
-          if (cells.length >= 4) {
-            relatedKeywords.push({
-              keyword: cells[0]?.textContent?.trim() || '未知',
-              volume: cells[1]?.textContent?.trim() || '未知',
-              clicks: cells[2]?.textContent?.trim() || '未知',
-              kd: cells[3]?.textContent?.trim() || '未知'
-            });
+        keywordCells.forEach(cell => {
+          const row = Number(cell.getAttribute('data-table-row'));
+          const col = Number(cell.getAttribute('data-table-col'));
+        
+          if (!rowMap.has(row)) rowMap.set(row, {});
+          const rowData = rowMap.get(row);
+        
+          switch (col) {
+            case 0: // keyword
+              rowData.keyword = cell.querySelector('a')?.textContent?.trim() || '未知';
+              break;
+            case 1: // volume
+              rowData.volume = cell.textContent?.trim() || '未知';
+              break;
+            case 5: // clickThroughRate
+              rowData.clickThroughRate = cell.textContent?.trim() || '未知';
+              break;
+            case 6: // kd
+              rowData.kd = cell.textContent?.trim() || '未知';
+              break;
+            // 其他列你可按需添加
           }
-        }
+        });
+        
+        relatedKeywords = Array.from(rowMap.values());
       }
       
       // 获取头部网站数据
@@ -101,21 +112,27 @@ const fetchKeywordData = async (): Promise<any> => {
       let topCompetitors: Array<{website: string, clicks: string}> = [];
       
       if (topCompetitorsContainer) {
-        // 找到头部网站表格
-        const competitorRows = topCompetitorsContainer.querySelectorAll('tr');
-        
-        // 跳过表头行，处理每一行数据
-        for (let i = 1; i < competitorRows.length; i++) {
-          const row = competitorRows[i];
-          const cells = row.querySelectorAll('td');
-          
-          if (cells.length >= 2) {
-            topCompetitors.push({
-              website: cells[0]?.textContent?.trim() || '未知',
-              clicks: cells[1]?.textContent?.trim() || '未知'
-            });
+        const cells = topCompetitorsContainer.querySelectorAll('[data-table-row][data-table-col]');
+        const rowMap = new Map<number, any>();
+
+        cells.forEach(cell => {
+          const row = Number(cell.getAttribute('data-table-row'));
+          const col = Number(cell.getAttribute('data-table-col'));
+
+          if (!rowMap.has(row)) rowMap.set(row, {});
+          const rowData = rowMap.get(row);
+
+          switch (col) {
+            case 0: // website
+              rowData.website = cell.querySelector('a')?.textContent?.trim() || '未知';
+              break;
+            case 1: // clicks
+              rowData.clicks = cell.querySelector('div[class*="ClicksTrendValueContainer"]')?.textContent?.trim() || '未知';
+              break;
+            // 其他列你可按需添加
           }
-        }
+        });
+        topCompetitors = Array.from(rowMap.values());
       }
       
       // 从页面上提取数据
@@ -133,8 +150,6 @@ const fetchKeywordData = async (): Promise<any> => {
         },
         // 动态趋势
         trends: {
-          current: document.querySelector('[id*="当前"] + div')?.textContent?.trim() || '未知',
-          change: document.querySelector('[id*="变化"] + div')?.textContent?.trim() || '未知',
           chartUrl: trendChartUrl
         },
         // 相关关键词
