@@ -42,6 +42,7 @@ export interface KeywordData {
     current: string;
     change: string;
     chartUrl: string;
+    chartBase64?: string;
   };
   difficulty?: string | number;
   relatedKeywords?: Array<{

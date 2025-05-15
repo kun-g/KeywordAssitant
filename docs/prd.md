@@ -28,7 +28,8 @@ KeywordAssistant 是一个“半自动化反向链接获取助手”，强调人
 ### 2.1 SimilarWeb 数据提取
 
 - 关键词数据提取
-
+- 落地页抓取
+https://sim.3ue.co/#/organicsearch/pageAnalysis/landing-pages-v2/*/999/28d?key=crazygames.com&pageFilter=%5B%7B%22url%22%3A%22crazygames.com%22%2C%22searchType%22%3A%22domain%22%7D%5D&webSource=Total&selectedPageTab=Organic
 
 ---
 

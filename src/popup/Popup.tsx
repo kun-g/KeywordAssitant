@@ -11,6 +11,7 @@ const Popup = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<{success?: boolean; message?: string} | null>(null);
   const [keywordData, setKeywordData] = useState<KeywordData | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
     const getCurrentPlatform = async () => {
@@ -148,6 +149,71 @@ const Popup = () => {
     return String(value);
   };
 
+  // 导出关键词数据为JSON文件
+  const saveKeywordData = () => {
+    if (!keywordData) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // 准备要导出的数据
+      const dataToExport = {
+        ...JSON.parse(JSON.stringify(keywordData)),
+        exported_at: new Date().toISOString(),
+      };
+      
+      // 如果有base64版本的图表，使用它替换Blob URL以便持久保存
+      if (dataToExport.trends && dataToExport.trends.chartBase64) {
+        dataToExport.trends.chartUrl = dataToExport.trends.chartBase64;
+        delete dataToExport.trends.chartBase64; // 删除多余的字段
+      }
+      
+      // 创建Blob对象
+      const jsonString = JSON.stringify(dataToExport, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      
+      // 创建下载链接
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${keywordData.keyword || 'keyword'}.json`;
+      
+      // 触发下载
+      document.body.appendChild(a);
+      a.click();
+      
+      // 清理
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setIsSaving(false);
+      
+      // 显示成功提示
+      setFetchStatus({
+        success: true,
+        message: `成功保存"${keywordData.keyword}"数据为JSON文件`
+      });
+      
+      // 3秒后清除提示
+      setTimeout(() => {
+        setFetchStatus(prevStatus => {
+          // 只有当当前消息是保存成功提示时才清除
+          if (prevStatus?.message?.includes('成功保存') && prevStatus.success) {
+            return null;
+          }
+          return prevStatus;
+        });
+      }, 3000);
+    } catch (err) {
+      console.error('导出数据失败:', err);
+      setIsSaving(false);
+      setFetchStatus({
+        success: false,
+        message: `导出失败: ${err instanceof Error ? err.message : '未知错误'}`
+      });
+    }
+  };
+
   return (
     <div className="w-96 p-4">
       <header className="mb-4">
@@ -212,8 +278,15 @@ const Popup = () => {
         {/* 显示抓取到的关键词数据 */}
         {keywordData && (
           <div className="mt-4 border border-gray-200 rounded-md overflow-hidden">
-            <div className="bg-gray-100 px-3 py-2 font-medium border-b border-gray-200">
-              关键词数据：{keywordData.keyword}
+            <div className="bg-gray-100 px-3 py-2 font-medium border-b border-gray-200 flex justify-between items-center">
+              <div>关键词数据：{keywordData.keyword}</div>
+              <button
+                className={`text-xs px-2 py-1 rounded text-white ${isSaving ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}
+                onClick={saveKeywordData}
+                disabled={isSaving}
+              >
+                {isSaving ? '保存中...' : '保存JSON'}
+              </button>
             </div>
             <div className="p-3 text-sm">
               <div className="grid grid-cols-2 gap-2">

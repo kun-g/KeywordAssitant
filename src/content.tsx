@@ -60,13 +60,23 @@ const fetchKeywordData = async (): Promise<any> => {
       const trendOverTimeContainer = document.querySelector('div[class*="TrendOverTimeWrapper"]');
       const trendChart = trendOverTimeContainer?.querySelector('svg.highcharts-root');
       let trendChartUrl = '';
+      let trendChartBase64 = '';
       
       if (trendChart) {
         try {
-          // 将SVG转换为Data URL
+          // 将SVG转换为字符串
           const svgData = new XMLSerializer().serializeToString(trendChart);
+          
+          // 1. 创建Blob URL用于插件内展示（性能更好）
           const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
           trendChartUrl = URL.createObjectURL(svgBlob);
+          
+          // 2. 同时创建base64编码用于JSON导出
+          // 添加SVG XML命名空间以确保正确渲染
+          const svgString = svgData.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+          // 使用base64编码SVG数据创建Data URL
+          const base64 = btoa(unescape(encodeURIComponent(svgString)));
+          trendChartBase64 = `data:image/svg+xml;base64,${base64}`;
         } catch (e) {
           console.error('无法创建趋势图URL:', e);
         }
@@ -150,7 +160,8 @@ const fetchKeywordData = async (): Promise<any> => {
         },
         // 动态趋势
         trends: {
-          chartUrl: trendChartUrl
+          chartUrl: trendChartUrl,
+          chartBase64: trendChartBase64
         },
         // 相关关键词
         relatedKeywords,
