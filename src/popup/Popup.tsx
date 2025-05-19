@@ -1,7 +1,16 @@
 import { useState, useEffect, StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import '../styles/globals.css';
-import { PlatformType, KeywordData } from '../types/index';
+import { PlatformType, KeywordData, Sim3ueKeywordData, SumrushKeywordData } from '../types/index';
+
+// 类型守卫函数，用于区分不同平台的数据
+function isSim3ueData(data: KeywordData): data is Sim3ueKeywordData {
+  return data.platform === 'sim3ue';
+}
+
+function isSumrushData(data: KeywordData): data is SumrushKeywordData {
+  return data.platform === 'sumrush';
+}
 
 const Popup = () => {
   const [platform, setPlatform] = useState<PlatformType | null>(null);
@@ -37,8 +46,8 @@ const Popup = () => {
           if (response && response.platform) {
             setPlatform(response.platform);
             
-            // 如果是sim3ue平台，尝试获取关键词
-            if (response.platform === 'sim3ue' && activeTab.id) {
+            // 如果是支持的平台，尝试获取关键词
+            if ((response.platform === 'sim3ue' || response.platform === 'sumrush') && activeTab.id) {
               chrome.tabs.sendMessage(activeTab.id, { action: 'get_keyword' }, (keywordResponse) => {
                 if (keywordResponse && keywordResponse.keyword) {
                   setKeyword(keywordResponse.keyword);
@@ -218,15 +227,11 @@ const Popup = () => {
     }
   };
 
-  // 根据平台类型渲染不同的关键词数据
-  const renderKeywordData = () => {
+  // 通用的头部部分
+  const renderHeader = () => {
     if (!keywordData) return null;
     
-    // 使用数据中的platform字段，如果没有则使用当前检测到的platform
-    const dataPlatform = keywordData.platform || platform;
-    
-    // 通用的头部部分
-    const renderHeader = () => (
+    return (
       <div className="bg-gray-100 px-3 py-2 font-medium border-b border-gray-200 flex justify-between items-center">
         <div>关键词数据：{keywordData.keyword}</div>
         <button
@@ -238,27 +243,32 @@ const Popup = () => {
         </button>
       </div>
     );
+  };
+  
+  // 通用的趋势图部分
+  const renderTrends = () => {
+    if (!keywordData || !keywordData.trends || !keywordData.trends.chartUrl) return null;
     
-    // 通用的趋势图部分
-    const renderTrends = () => {
-      if (!keywordData.trends || !keywordData.trends.chartUrl) return null;
-      
-      return (
-        <div className="mt-3">
-          <h3 className="font-medium mb-1">动态趋势</h3>
-          <div className="flex flex-col">
-            <img 
-              src={keywordData.trends.chartUrl} 
-              alt="趋势图" 
-              className="w-full border border-gray-200 rounded"
-            />
-          </div>
+    return (
+      <div className="mt-3">
+        <h3 className="font-medium mb-1">动态趋势</h3>
+        <div className="flex flex-col">
+          <img 
+            src={keywordData.trends.chartUrl} 
+            alt="趋势图" 
+            className="w-full border border-gray-200 rounded"
+          />
         </div>
-      );
-    };
+      </div>
+    );
+  };
+
+  // 根据平台类型渲染不同的关键词数据
+  const renderKeywordData = () => {
+    if (!keywordData) return null;
     
     // Sim3ue平台特有的数据展示
-    if (dataPlatform === 'sim3ue') {
+    if (isSim3ueData(keywordData)) {
       return (
         <div className="mt-4 border border-gray-200 rounded-md overflow-hidden">
           {renderHeader()}
@@ -364,7 +374,7 @@ const Popup = () => {
     }
     
     // Sumrush平台特有的数据展示
-    if (dataPlatform === 'sumrush') {
+    if (isSumrushData(keywordData)) {
       return (
         <div className="mt-4 border border-gray-200 rounded-md overflow-hidden">
           {renderHeader()}
@@ -389,7 +399,7 @@ const Popup = () => {
             </div>
             
             {/* 国家分布数据 */}
-            {keywordData.countryDistribution && Object.keys(keywordData.countryDistribution).length > 0 && (
+            {Object.keys(keywordData.countryDistribution).length > 0 && (
               <div className="mt-3">
                 <h3 className="font-medium mb-1">国家分布</h3>
                 <div className="overflow-x-auto">
@@ -431,7 +441,7 @@ const Popup = () => {
                       {keywordData.topCompetitors.map((competitor, index) => (
                         <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="text-xs p-2 border border-gray-200">{competitor.website}</td>
-                          <td className="text-xs p-2 border border-gray-200">{competitor.traffic || competitor.clicks || '未知'}</td>
+                          <td className="text-xs p-2 border border-gray-200">{competitor.traffic}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -461,7 +471,7 @@ const Popup = () => {
                           <td className="text-xs p-2 border border-gray-200">
                             {typeof relatedKeyword.difficulty === 'number' 
                               ? `${relatedKeyword.difficulty}%` 
-                              : relatedKeyword.kd || '未知'}
+                              : '未知'}
                           </td>
                         </tr>
                       ))}
@@ -531,7 +541,7 @@ const Popup = () => {
       <div className="mb-4 p-3 bg-gray-50 rounded-md">
         <h2 className="text-md font-semibold mb-2">关键词数据工具</h2>
         
-        {platform === 'sim3ue' && keyword && (
+        {(platform === 'sim3ue' || platform === 'sumrush') && keyword && (
           <div className="mb-2">
             <span className="text-sm text-gray-600">检测到关键词：</span>
             <span className="font-medium">{keyword}</span>
@@ -553,7 +563,7 @@ const Popup = () => {
         >
           {isFetching 
             ? '抓取中...' 
-            : platform === 'sim3ue' && keyword 
+            : (platform === 'sim3ue' || platform === 'sumrush') && keyword 
               ? `抓取"${keyword}"数据` 
               : '抓取页面数据'
           }

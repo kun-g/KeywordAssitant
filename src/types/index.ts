@@ -23,50 +23,75 @@ export interface Backlink {
   updated_at: number;
 }
 
-export interface KeywordData {
+// 基础关键词数据接口
+export interface BaseKeywordData {
   keyword: string;
-  volume?: string | number;
-  clicks?: string | number;
-  clickThroughRate?: string | number;
-  serp?: {
-    organic?: number;
-    features?: number;
-    ads?: number;
-    pla?: number;
-  };
+  platform: PlatformType; // 记录数据来源平台
+  captured_at: number;
+  source_url?: string;
+}
+
+// Sim3ue平台特定的关键词数据
+export interface Sim3ueKeywordData extends BaseKeywordData {
+  platform: 'sim3ue';
+  volume: string;
+  clicks: string;
+  clickThroughRate: string;
+  difficulty: string;
   devices?: {
-    desktop?: string | number;
-    mobile?: string | number;
+    desktop: string;
+    mobile: string;
   };
   trends?: {
-    current?: string;
-    change?: string;
     chartUrl?: string;
     chartBase64?: string;
   };
-  difficulty?: string | number;
   relatedKeywords?: Array<{
     keyword: string;
     volume: string;
-    clickThroughRate?: string;
-    kd?: string | number;
-    difficulty?: number;
+    clickThroughRate: string;
+    kd: string;
   }>;
   topCompetitors?: Array<{
     website: string;
-    clicks?: string;
-    traffic?: string;
+    clicks: string;
   }>;
-  // sumrush平台特有字段
-  region?: {
+}
+
+// Sumrush平台特定的关键词数据
+export interface SumrushKeywordData extends BaseKeywordData {
+  platform: 'sumrush';
+  volume: string;
+  difficulty: number;
+  region: {
     code: string;
     name: string;
   };
-  countryDistribution?: Record<string, string>;
-  platform?: PlatformType; // 记录数据来源平台
-  captured_at?: number;
-  source_url?: string;
+  countryDistribution: Record<string, string>;
+  trends?: {
+    chartUrl?: string;
+    chartBase64?: string;
+  };
+  relatedKeywords?: Array<{
+    keyword: string;
+    volume: string;
+    difficulty: number;
+  }>;
+  topCompetitors?: Array<{
+    website: string;
+    traffic: string;
+  }>;
 }
+
+// 通用关键词数据（用于其他平台或未知平台）
+export interface GenericKeywordData extends BaseKeywordData {
+  volume?: string | number;
+  difficulty?: string | number;
+  [key: string]: any; // 允许添加其他字段
+}
+
+// 联合类型，表示所有可能的关键词数据类型
+export type KeywordData = Sim3ueKeywordData | SumrushKeywordData | GenericKeywordData;
 
 export interface SiteConfig {
   name: string;

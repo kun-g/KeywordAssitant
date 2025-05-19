@@ -1,7 +1,7 @@
 // KeywordAssistant - 内容脚本
 // 负责在目标外链页面执行评论提交操作
 
-import { MessagePayload } from './types/index';
+import { MessagePayload, Sim3ueKeywordData, SumrushKeywordData } from './types/index';
 
 // React导入放在条件语句外，确保编译时可用
 // React自动导入by jsxInject
@@ -49,7 +49,7 @@ const extractKeywordFromUrl = (): string | null => {
 };
 
 // 抓取页面上的关键词数据
-const fetchKeywordData = async (): Promise<any> => {
+const fetchKeywordData = async () => {
   try {
     // 针对sim3ue平台
     if (detectPlatform() === 'sim3ue') {
@@ -94,7 +94,7 @@ const fetchKeywordData = async (): Promise<any> => {
       
       // 获取相关关键词
       const keywordsIdeasContainer = document.querySelector('div[data-automation="KeywordsIdeas"]');
-      let relatedKeywords: Array<{keyword: string, volume: string, clicks: string, kd: string}> = [];
+      let relatedKeywords: Array<{keyword: string, volume: string, clickThroughRate: string, kd: string}> = [];
       
       if (keywordsIdeasContainer) {
         const keywordCells = keywordsIdeasContainer.querySelectorAll('[data-table-row][data-table-col]');
@@ -155,8 +155,8 @@ const fetchKeywordData = async (): Promise<any> => {
         topCompetitors = Array.from(rowMap.values());
       }
       
-      // 从页面上提取数据
-      const dataPoints = {
+      // 从页面上提取数据，符合Sim3ueKeywordData类型
+      const dataPoints: Sim3ueKeywordData = {
         keyword,
         // 使用DataValue-类选择器获取volume、clicks和clickThroughRate
         volume: dataValueElements?.[0]?.textContent?.trim() || '未知',
@@ -315,8 +315,8 @@ const fetchKeywordData = async (): Promise<any> => {
         });
       }
 
-      // 组装数据 - 根据sumrush平台特性优化数据结构
-      return {
+      // 组装数据 - 符合SumrushKeywordData类型
+      const dataPoints: SumrushKeywordData = {
         keyword,
         volume: volumeElem?.textContent?.trim() || '未知',
         region: {
@@ -343,10 +343,17 @@ const fetchKeywordData = async (): Promise<any> => {
         // 记录来源URL
         source_url: window.location.href
       };
+      
+      return dataPoints;
     }
     
     // 其他平台
-    return { message: '当前仅支持Sim3ue和Sumrush平台' };
+    return { 
+      message: '当前仅支持Sim3ue和Sumrush平台',
+      platform: detectPlatform(),
+      keyword: extractKeywordFromUrl() || '未知',
+      captured_at: Date.now()
+    };
   } catch (error) {
     console.error('抓取关键词数据时出错:', error);
     throw error;
