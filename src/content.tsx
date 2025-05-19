@@ -26,6 +26,13 @@ function detectPlatform() {
 const extractKeywordFromUrl = (): string | null => {
   try {
     const url = new URL(window.location.href);
+    
+    // sumrush 平台关键词在 query string 的 q 参数
+    if (url.hostname.includes('sem.3ue.co') && url.searchParams.has('q')) {
+      return decodeURIComponent(url.searchParams.get('q') || '');
+    }
+    
+    // sim3ue 旧逻辑
     if (url.hash.includes('keyword=')) {
       // 从URL hash部分提取关键词参数
       const keywordMatch = url.hash.match(/keyword=([^&]+)/);
@@ -169,116 +176,181 @@ const fetchKeywordData = async (): Promise<any> => {
         // 相关关键词
         relatedKeywords,
         // 头部网站
-        topCompetitors
+        topCompetitors,
+        // 记录数据来源平台
+        platform: 'sim3ue',
+        // 记录抓取时间
+        captured_at: Date.now()
       };
       
       return dataPoints;
+    } 
+    // 针对sumrush平台
+    else if (detectPlatform() === 'sumrush') {
+      const keyword = extractKeywordFromUrl();
+      if (!keyword) {
+        throw new Error('无法从URL中提取关键词');
+      }
+
+      // 1. 抓取搜索量 - 根据用户提供的HTML更新选择器
+      const volumeElem = document.querySelector('span.kwo-widget-total[data-testid="volume-total"]');
+      
+      // 提取区域/国家信息
+      const regionElem = document.querySelector('div[data-testid="database-selector"] .___SText_cbs87-ko_');
+      const regionCode = document.querySelector('div[data-testid="database-selector"]')?.getAttribute('value') || '';
+      
+      // 2. 抓取关键词难度/竞争度 - 只存储整数值
+      const difficultyElem = document.querySelector('.kwo-kd__metric');
+      let difficultyValue = 0;
+      
+      if (difficultyElem) {
+        const difficultyText = difficultyElem.textContent?.trim() || '';
+        // 尝试提取百分比中的数字部分，例如从 "48%" 提取 48
+        const difficultyMatch = difficultyText.match(/(\d+)/);
+        if (difficultyMatch && difficultyMatch[1]) {
+          difficultyValue = parseInt(difficultyMatch[1], 10);
+        }
+      }
+      
+      // 3. 国家/地区分布数据 - 更精确地抓取并存储按国家的数据
+      const countryDistribution: Record<string, string> = {};
+      
+      // 获取所有国家项
+      const countryItems = document.querySelectorAll('.___SItem_1q27i-ko_');
+      
+      countryItems.forEach(item => {
+        try {
+          // 尝试获取国家代码
+          const flagElem = item.querySelector('.flag-4_29_0');
+          if (!flagElem) return;
+          
+          const flagClassList = flagElem.className.split(' ');
+          const flagClass = flagClassList.find(cls => cls.startsWith('flag-') && cls.endsWith('-4_29_0'));
+          if (!flagClass) return;
+          
+          // 从类名中提取国家代码 (形如 flag-united-states-4_29_0)
+          const countryCodeMatch = flagClass.match(/flag-([\w-]+)-4_29_0/);
+          if (!countryCodeMatch || !countryCodeMatch[1]) return;
+          
+          const countryCode = countryCodeMatch[1];
+          
+          // 获取国家名称和搜索量
+          const countryName = item.querySelector('.___SText_cbs87-ko_')?.textContent?.trim() || countryCode;
+          
+          // 搜索量通常在最后一个元素中
+          const volumeText = item.lastElementChild?.textContent?.trim() || '0';
+          
+          // 将国家代码作为键，搜索量作为值存储
+          countryDistribution[countryCode] = volumeText;
+        } catch (e) {
+          console.error('解析国家数据失败:', e);
+        }
+      });
+
+      // 4. 趋势图（SVG）- 尝试找到趋势图表
+      const trendChart = document.querySelector('.kwo-trends-chart svg');
+      let trendChartUrl = '';
+      let trendChartBase64 = '';
+      
+      if (trendChart) {
+        try {
+          // 将SVG转换为字符串
+          const svgData = new XMLSerializer().serializeToString(trendChart);
+          
+          // 创建Blob URL用于插件内展示
+          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+          trendChartUrl = URL.createObjectURL(svgBlob);
+          
+          // 创建base64编码用于JSON导出
+          const svgString = svgData.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+          const base64 = btoa(unescape(encodeURIComponent(svgString)));
+          trendChartBase64 = `data:image/svg+xml;base64,${base64}`;
+        } catch (e) {
+          console.error('无法创建趋势图URL:', e);
+        }
+      }
+
+      // 5. 相关关键词
+      let relatedKeywords: Array<{keyword: string, volume: string, difficulty: number}> = [];
+      const relatedKeywordsTable = document.querySelector('.kwo-related-keywords-table');
+      
+      if (relatedKeywordsTable) {
+        const rows = relatedKeywordsTable.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 3) {
+            // 尝试将难度转换为整数
+            let kd = 0;
+            const kdText = cells[2]?.textContent?.trim() || '';
+            const kdMatch = kdText.match(/(\d+)/);
+            if (kdMatch && kdMatch[1]) {
+              kd = parseInt(kdMatch[1], 10);
+            }
+            
+            relatedKeywords.push({
+              keyword: cells[0]?.textContent?.trim() || '未知',
+              volume: cells[1]?.textContent?.trim() || '未知',
+              difficulty: kd
+            });
+          }
+        });
+      }
+
+      // 6. 头部网站/竞争对手
+      let topCompetitors: Array<{website: string, traffic: string}> = [];
+      const competitorsTable = document.querySelector('.kwo-serp-table');
+      
+      if (competitorsTable) {
+        const rows = competitorsTable.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+          const domainCell = row.querySelector('td.kwo-serp-table__domain');
+          const trafficCell = row.querySelector('td.kwo-serp-table__traffic');
+          
+          if (domainCell && trafficCell) {
+            topCompetitors.push({
+              website: domainCell.textContent?.trim() || '未知',
+              traffic: trafficCell.textContent?.trim() || '未知',
+            });
+          }
+        });
+      }
+
+      // 组装数据 - 根据sumrush平台特性优化数据结构
+      return {
+        keyword,
+        volume: volumeElem?.textContent?.trim() || '未知',
+        region: {
+          code: regionCode,
+          name: regionElem?.textContent?.trim() || '未知'
+        },
+        // 仅存储整数难度值
+        difficulty: difficultyValue,
+        // 按国家的搜索量分布
+        countryDistribution,
+        // 动态趋势
+        trends: {
+          chartUrl: trendChartUrl,
+          chartBase64: trendChartBase64
+        },
+        // 相关关键词
+        relatedKeywords,
+        // 头部网站
+        topCompetitors,
+        // 记录数据来源平台
+        platform: 'sumrush',
+        // 记录抓取时间
+        captured_at: Date.now(),
+        // 记录来源URL
+        source_url: window.location.href
+      };
     }
     
     // 其他平台
-    return { message: '当前仅支持Sim3ue平台' };
+    return { message: '当前仅支持Sim3ue和Sumrush平台' };
   } catch (error) {
     console.error('抓取关键词数据时出错:', error);
     throw error;
   }
-};
-
-// 渲染关键词抓取按钮
-const renderKeywordFetchButton = () => {
-  // 移除已存在的按钮（如果有）
-  const existingContainer = document.getElementById('KeywordAssistant-keyword-container');
-  if (existingContainer) {
-    existingContainer.remove();
-  }
-  
-  const container = document.createElement('div');
-  container.id = 'KeywordAssistant-keyword-container';
-  document.body.appendChild(container);
-  
-  const keyword = extractKeywordFromUrl() || '页面数据';
-  const platform = detectPlatform();
-  
-  const root = ReactDOM.createRoot(container);
-  root.render(
-    <div 
-      style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        zIndex: 9999,
-        padding: '10px 15px',
-        background: '#0079fb',
-        color: 'white',
-        borderRadius: '5px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-        fontSize: '14px',
-        fontWeight: 'bold'
-      }}
-      onClick={() => {
-        fetchKeywordData()
-          .then(data => {
-            alert(`数据已抓取成功！平台: ${platform}`);
-            console.log('抓取的数据:', data);
-          })
-          .catch(err => {
-            alert(`抓取失败: ${err.message}`);
-          });
-      }}
-      title="抓取页面数据"
-    >
-      抓取{keyword !== '页面数据' ? `"${keyword}"` : '页面'}数据
-    </div>
-  );
-};
-
-// 注入UI组件
-const injectUI = (platform: string) => {
-  // 只在支持的平台上显示UI
-  if (platform !== 'sim3ue' && platform !== 'ahrefs') {
-    console.log('KeywordAssistant: 当前平台不支持，不显示UI:', platform);
-    return;
-  }
-
-  // 移除已存在的容器(如果有)
-  const existingContainer = document.getElementById('KeywordAssistant-container');
-  if (existingContainer) {
-    existingContainer.remove();
-  }
-  
-  const container = document.createElement('div');
-  container.id = 'KeywordAssistant-container';
-  document.body.appendChild(container);
-  
-  const root = ReactDOM.createRoot(container);
-  root.render(
-    <div 
-      style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        zIndex: 9999,
-        padding: '10px',
-        background: '#0079fb',
-        color: 'white',
-        borderRadius: '50%',
-        width: '40px',
-        height: '40px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-      }}
-      title="KeywordAssistant已加载"
-      onClick={() => renderKeywordFetchButton()}
-    >
-      KA
-    </div>
-  );
 };
 
 // 监听来自Background的消息
@@ -347,22 +419,15 @@ window.addEventListener('load', () => {
   const platform = detectPlatform();
   console.log('KeywordAssistant 内容脚本已加载, 平台类型:', platform);
   
-  // 添加可视化标记和抓取按钮，但只在支持的平台上显示
-  if (platform === 'sim3ue' || platform === 'ahrefs') {
-    console.log('KeywordAssistant: 注入UI组件');
-    injectUI(platform);
-  
-    // 如果是Sim3ue平台，自动显示关键词抓取按钮
-    if (platform === 'sim3ue') {
-      console.log('KeywordAssistant: 检测到Sim3ue平台，尝试提取关键词');
-      const keyword = extractKeywordFromUrl();
-      if (keyword) {
-        console.log('KeywordAssistant: 检测到关键词:', keyword);
-        renderKeywordFetchButton();
-      }
+  // 仅检测平台和关键词，不再注入UI组件
+  if (platform === 'sim3ue' || platform === 'ahrefs' || platform === 'sumrush') {
+    console.log(`KeywordAssistant: 检测到${platform}平台，尝试提取关键词`);
+    const keyword = extractKeywordFromUrl();
+    if (keyword) {
+      console.log('KeywordAssistant: 检测到关键词:', keyword);
     }
   } else {
-    console.log('KeywordAssistant: 不支持当前平台，不显示UI组件');
+    console.log('KeywordAssistant: 不支持当前平台:', platform);
   }
 });
 

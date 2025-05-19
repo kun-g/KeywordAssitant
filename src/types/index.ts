@@ -39,22 +39,31 @@ export interface KeywordData {
     mobile?: string | number;
   };
   trends?: {
-    current: string;
-    change: string;
-    chartUrl: string;
+    current?: string;
+    change?: string;
+    chartUrl?: string;
     chartBase64?: string;
   };
   difficulty?: string | number;
   relatedKeywords?: Array<{
     keyword: string;
     volume: string;
-    clickThroughRate: string;
-    kd: string;
+    clickThroughRate?: string;
+    kd?: string | number;
+    difficulty?: number;
   }>;
   topCompetitors?: Array<{
     website: string;
-    clicks: string;
+    clicks?: string;
+    traffic?: string;
   }>;
+  // sumrush平台特有字段
+  region?: {
+    code: string;
+    name: string;
+  };
+  countryDistribution?: Record<string, string>;
+  platform?: PlatformType; // 记录数据来源平台
   captured_at?: number;
   source_url?: string;
 }
