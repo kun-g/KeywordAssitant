@@ -35,11 +35,13 @@
     },
     {
       "matches": [
-        "*://sem.3ue.co/*"
+        "*://sem.3ue.co/analytics/traffic/subfolders-subdomains*",
+        "*://sem.3ue.co/*/analytics/traffic/subfolders-subdomains*"
       ],
       "js": [
         "src/content_subdomain_scraper.ts-loader.js"
-      ]
+      ],
+      "run_at": "document_idle"
     }
   ],
   "permissions": [

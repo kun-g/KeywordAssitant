@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SubdomainData } from '../types';
-
+import { scrapeSubdomains } from '../content_subdomain_scraper';
 interface SubdomainViewProps {
   onBack: () => void;
 }
@@ -19,7 +19,7 @@ const SubdomainView = ({ onBack }: SubdomainViewProps) => {
     const loadSubdomains = async () => {
       try {
         setLoading(true);
-        
+
         // 从后台脚本获取所有子域名/子文件夹数据
         chrome.runtime.sendMessage({ action: 'get_all_subdomains' }, (response) => {
           if (chrome.runtime.lastError) {
@@ -64,6 +64,7 @@ const SubdomainView = ({ onBack }: SubdomainViewProps) => {
     })
     .sort((a, b) => {
       // 排序
+        console.log('a.traffic', a);
       if (sortBy === 'domain') {
         return sortOrder === 'asc'
           ? a.domain.localeCompare(b.domain)
