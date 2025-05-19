@@ -10,10 +10,13 @@ import ReactDOM from 'react-dom/client';
 // 判断页面平台类型
 function detectPlatform() {
   const html = document.documentElement.innerHTML;
+  console.log('KeywordAssistant: 当前页面URL:', window.location.hostname);
   if (window.location.hostname.includes('ahrefs')) {
     return 'ahrefs';
   } else if (window.location.hostname.includes('sim.3ue.co')) {
     return 'sim3ue';
+  } else if (window.location.hostname.includes('sem.3ue.co')) {
+    return 'sumrush';
   } else {
     return 'unknown';
   }
@@ -233,7 +236,19 @@ const renderKeywordFetchButton = () => {
 };
 
 // 注入UI组件
-const injectUI = () => {
+const injectUI = (platform: string) => {
+  // 只在支持的平台上显示UI
+  if (platform !== 'sim3ue' && platform !== 'ahrefs') {
+    console.log('KeywordAssistant: 当前平台不支持，不显示UI:', platform);
+    return;
+  }
+
+  // 移除已存在的容器(如果有)
+  const existingContainer = document.getElementById('KeywordAssistant-container');
+  if (existingContainer) {
+    existingContainer.remove();
+  }
+  
   const container = document.createElement('div');
   container.id = 'KeywordAssistant-container';
   document.body.appendChild(container);
@@ -329,20 +344,25 @@ chrome.runtime.onMessage.addListener((message: MessagePayload, _sender, sendResp
 
 // 页面加载完成后执行
 window.addEventListener('load', () => {
-  console.log('KeywordAssistant 内容脚本已加载, 平台类型:', detectPlatform());
+  const platform = detectPlatform();
+  console.log('KeywordAssistant 内容脚本已加载, 平台类型:', platform);
   
-  // 添加可视化标记和抓取按钮
-  console.log('KeywordAssistant: 注入UI组件');
-  injectUI();
+  // 添加可视化标记和抓取按钮，但只在支持的平台上显示
+  if (platform === 'sim3ue' || platform === 'ahrefs') {
+    console.log('KeywordAssistant: 注入UI组件');
+    injectUI(platform);
   
-  // 如果是Sim3ue平台，自动显示关键词抓取按钮
-  if (detectPlatform() === 'sim3ue') {
-    console.log('KeywordAssistant: 检测到Sim3ue平台，尝试提取关键词');
-    const keyword = extractKeywordFromUrl();
-    if (keyword) {
-      console.log('KeywordAssistant: 检测到关键词:', keyword);
-      renderKeywordFetchButton();
+    // 如果是Sim3ue平台，自动显示关键词抓取按钮
+    if (platform === 'sim3ue') {
+      console.log('KeywordAssistant: 检测到Sim3ue平台，尝试提取关键词');
+      const keyword = extractKeywordFromUrl();
+      if (keyword) {
+        console.log('KeywordAssistant: 检测到关键词:', keyword);
+        renderKeywordFetchButton();
+      }
     }
+  } else {
+    console.log('KeywordAssistant: 不支持当前平台，不显示UI组件');
   }
 });
 

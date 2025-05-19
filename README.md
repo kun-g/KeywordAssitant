@@ -86,5 +86,4 @@ yarn build
 - 当前版本处于开发阶段，功能可能不完整
 
 ## 联系和贡献
-
-欢迎提交Issue和PR！ 
+- popup.tsx/getPlatformName 和 contet.tsx/detectPlatform 转移到 utils/platformDetect.tsx

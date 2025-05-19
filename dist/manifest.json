@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KeywordAssistant",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "外链收集、管理与提交的Chrome浏览器扩展",
   "action": {
     "default_popup": "src/popup/index.html",

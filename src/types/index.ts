@@ -4,7 +4,7 @@ export type LinkStatus = 'pending' | 'submitted' | 'success' | 'failed' | 'ignor
 
 export type LinkType = 'blog' | 'forum' | 'directory' | 'paid' | 'other';
 
-export type PlatformType = 'ahrefs' | 'custom' | 'unknown' | 'sim3ue';
+export type PlatformType = 'ahrefs' | 'custom' | 'unknown' | 'sim3ue' | 'sumrush';
 
 export interface Backlink {
   id: string;

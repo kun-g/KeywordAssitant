@@ -117,6 +117,8 @@ const Popup = () => {
         return 'Ahrefs';
       case 'sim3ue':
         return 'Sim3ue关键词平台';
+      case 'sumrush':
+        return 'SumRush';
       case 'custom':
         return '自定义平台';
       case 'unknown':
