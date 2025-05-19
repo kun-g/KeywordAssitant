@@ -2,7 +2,7 @@
  * KeywordAssistant 存储工具函数
  */
 
-import { Backlink, SiteConfig, KeywordAssistantStorage } from '../types';
+import { Backlink, SiteConfig, KeywordAssistantStorage, SubdomainData } from '../types';
 
 /**
  * 获取所有外链数据
@@ -42,21 +42,26 @@ export const addBacklink = async (backlink: Backlink): Promise<boolean> => {
   try {
     const backlinks = await getBacklinks();
     
-    // 检查是否已存在相同的外链
-    const exists = backlinks.some(link => link.source_url === backlink.source_url);
+    // 检查是否已存在相同URL的外链
+    const existingIndex = backlinks.findIndex(b => b.source_url === backlink.source_url);
     
-    if (!exists) {
-      const updatedBacklinks = [...backlinks, {
+    if (existingIndex >= 0) {
+      // 更新现有外链
+      backlinks[existingIndex] = {
+        ...backlinks[existingIndex],
         ...backlink,
-        id: backlink.id || Date.now().toString(),
-        created_at: backlink.created_at || Date.now(),
-        updated_at: backlink.updated_at || Date.now()
-      }];
-      
-      return await saveBacklinks(updatedBacklinks);
+        updated_at: Date.now()
+      };
+    } else {
+      // 添加新外链
+      backlinks.push({
+        ...backlink,
+        created_at: Date.now(),
+        updated_at: Date.now()
+      });
     }
-    
-    return false;
+      
+    return await saveBacklinks(backlinks);
   } catch (error) {
     console.error('添加外链失败:', error);
     return false;
@@ -103,26 +108,10 @@ export const updateBacklinkStatus = async (
 export const getSiteConfig = async (): Promise<SiteConfig> => {
   try {
     const { site_config } = await chrome.storage.local.get('site_config');
-    
-    if (!site_config) {
-      // 默认站点配置
-      return {
-        name: '',
-        domain: '',
-        tags: [],
-        industry: ''
-      };
-    }
-    
-    return site_config;
+    return site_config || { name: '', domain: '', tags: [], industry: '' };
   } catch (error) {
     console.error('获取站点配置失败:', error);
-    return {
-      name: '',
-      domain: '',
-      tags: [],
-      industry: ''
-    };
+    return { name: '', domain: '', tags: [], industry: '' };
   }
 };
 
@@ -142,6 +131,153 @@ export const saveSiteConfig = async (config: SiteConfig): Promise<boolean> => {
 };
 
 /**
+ * 获取所有子域名/子文件夹数据
+ * @returns Promise<SubdomainData[]>
+ */
+export const getSubdomains = async (): Promise<SubdomainData[]> => {
+  try {
+    const { subdomains = [] } = await chrome.storage.local.get('subdomains');
+    return subdomains;
+  } catch (error) {
+    console.error('获取子域名/子文件夹数据失败:', error);
+    return [];
+  }
+};
+
+/**
+ * 保存子域名/子文件夹数据
+ * @param subdomains 子域名/子文件夹数据
+ * @returns Promise<boolean>
+ */
+export const saveSubdomains = async (subdomains: SubdomainData[]): Promise<boolean> => {
+  try {
+    await chrome.storage.local.set({ subdomains });
+    return true;
+  } catch (error) {
+    console.error('保存子域名/子文件夹数据失败:', error);
+    return false;
+  }
+};
+
+/**
+ * 添加新子域名/子文件夹数据
+ * @param subdomain 子域名/子文件夹数据
+ * @returns Promise<boolean>
+ */
+export const addSubdomain = async (subdomain: SubdomainData): Promise<boolean> => {
+  try {
+    const subdomains = await getSubdomains();
+    
+    // 检查是否已存在相同域名的数据
+    const existingIndex = subdomains.findIndex(s => s.domain === subdomain.domain);
+    
+    if (existingIndex >= 0) {
+      // 更新现有数据
+      subdomains[existingIndex] = {
+        ...subdomains[existingIndex],
+        ...subdomain,
+        updated_at: Date.now()
+      };
+    } else {
+      // 添加新数据
+      subdomains.push({
+        ...subdomain,
+        created_at: Date.now(),
+        updated_at: Date.now()
+      });
+    }
+    
+    return await saveSubdomains(subdomains);
+  } catch (error) {
+    console.error('添加子域名/子文件夹数据失败:', error);
+    return false;
+  }
+};
+
+/**
+ * 批量添加子域名/子文件夹数据
+ * @param newSubdomains 子域名/子文件夹数据数组
+ * @returns Promise<{success: boolean, added: number, duplicates: number}>
+ */
+export const addSubdomainsBatch = async (newSubdomains: SubdomainData[]): Promise<{success: boolean, added: number, duplicates: number}> => {
+  try {
+    const subdomains = await getSubdomains();
+    let added = 0;
+    let duplicates = 0;
+    
+    // 当前时间戳
+    const now = Date.now();
+    
+    // 处理每个新子域名/子文件夹
+    for (const newItem of newSubdomains) {
+      // 检查是否已存在
+      const existingIndex = subdomains.findIndex(s => s.domain === newItem.domain);
+      
+      if (existingIndex >= 0) {
+        // 更新现有数据
+        subdomains[existingIndex] = {
+          ...subdomains[existingIndex],
+          ...newItem,
+          updated_at: now
+        };
+        duplicates++;
+      } else {
+        // 添加新数据
+        subdomains.push({
+          ...newItem,
+          created_at: now,
+          updated_at: now
+        });
+        added++;
+      }
+    }
+    
+    // 保存更新后的数据
+    const success = await saveSubdomains(subdomains);
+    return { success, added, duplicates };
+  } catch (error) {
+    console.error('批量添加子域名/子文件夹数据失败:', error);
+    return { success: false, added: 0, duplicates: 0 };
+  }
+};
+
+/**
+ * 删除子域名/子文件夹数据
+ * @param domain 要删除的子域名/子文件夹
+ * @returns Promise<boolean>
+ */
+export const deleteSubdomain = async (domain: string): Promise<boolean> => {
+  try {
+    const subdomains = await getSubdomains();
+    const filteredSubdomains = subdomains.filter(s => s.domain !== domain);
+    
+    // 如果长度相同，说明没有找到要删除的项
+    if (filteredSubdomains.length === subdomains.length) {
+      return false;
+    }
+    
+    return await saveSubdomains(filteredSubdomains);
+  } catch (error) {
+    console.error('删除子域名/子文件夹数据失败:', error);
+    return false;
+  }
+};
+
+/**
+ * 清空所有存储数据
+ * @returns Promise<boolean>
+ */
+export const clearAllStorage = async (): Promise<boolean> => {
+  try {
+    await chrome.storage.local.clear();
+    return true;
+  } catch (error) {
+    console.error('清空存储失败:', error);
+    return false;
+  }
+};
+
+/**
  * 导出所有数据
  * @returns Promise<KeywordAssistantStorage>
  */
@@ -149,10 +285,12 @@ export const exportAllData = async (): Promise<KeywordAssistantStorage> => {
   try {
     const backlinks = await getBacklinks();
     const site_config = await getSiteConfig();
+    const subdomains = await getSubdomains();
     
     return {
       backlinks,
-      site_config
+      site_config,
+      subdomains
     };
   } catch (error) {
     console.error('导出数据失败:', error);

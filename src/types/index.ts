@@ -36,8 +36,12 @@ export interface Sim3ueKeywordData extends BaseKeywordData {
   platform: 'sim3ue';
   volume: string;
   clicks: string;
-  clickThroughRate: string;
-  difficulty: string;
+  cpc: string;
+  competition: string;
+  results: string;
+  position?: number;
+  clickThroughRate?: string;
+  difficulty?: string;
   devices?: {
     desktop: string;
     mobile: string;
@@ -58,16 +62,20 @@ export interface Sim3ueKeywordData extends BaseKeywordData {
   }>;
 }
 
-// Sumrush平台特定的关键词数据
+// Semrush平台特定的关键词数据
 export interface SumrushKeywordData extends BaseKeywordData {
   platform: 'sumrush';
   volume: string;
-  difficulty: number;
-  region: {
-    code: string;
+  kd: string;
+  cpc: string;
+  competition: string;
+  results: string;
+  difficulty?: string;
+  region?: {
     name: string;
+    code: string;
   };
-  countryDistribution: Record<string, string>;
+  countryDistribution?: Record<string, string>;
   trends?: {
     chartUrl?: string;
     chartBase64?: string;
@@ -75,24 +83,19 @@ export interface SumrushKeywordData extends BaseKeywordData {
   relatedKeywords?: Array<{
     keyword: string;
     volume: string;
-    difficulty: number;
+    difficulty: string;
   }>;
   topCompetitors?: Array<{
     website: string;
     traffic: string;
   }>;
+  intent?: string;
 }
 
-// 通用关键词数据（用于其他平台或未知平台）
-export interface GenericKeywordData extends BaseKeywordData {
-  volume?: string | number;
-  difficulty?: string | number;
-  [key: string]: any; // 允许添加其他字段
-}
+// 通用关键词数据类型
+export type KeywordData = Sim3ueKeywordData | SumrushKeywordData;
 
-// 联合类型，表示所有可能的关键词数据类型
-export type KeywordData = Sim3ueKeywordData | SumrushKeywordData | GenericKeywordData;
-
+// 站点配置
 export interface SiteConfig {
   name: string;
   domain: string;
@@ -100,17 +103,40 @@ export interface SiteConfig {
   industry: string;
 }
 
+// 子域名/子文件夹数据接口
+export interface SubdomainData {
+  domain: string;
+  link: string;
+  traffic: string;
+  desktopShare: string;
+  mobileShare: string;
+  isSubdomain: boolean;
+  parentDomain: string;
+  created_at: number;
+  updated_at: number;
+}
+
+// 插件存储结构
 export interface KeywordAssistantStorage {
   backlinks: Backlink[];
   site_config: SiteConfig;
-  keywords?: KeywordData[];
+  keywords: KeywordData[];
+  subdomains: SubdomainData[];
 }
 
+// 消息类型定义
 export interface MessagePayload {
   action: string;
-  data: any;
+  [key: string]: any;
 }
 
+// 子域名/子文件夹数据获取消息
+export interface SubdomainDataFetchedMessage extends MessagePayload {
+  action: 'subdomain_data_fetched';
+  data: SubdomainData[];
+}
+
+// 关键词数据获取消息
 export interface KeywordDataFetchedMessage extends MessagePayload {
   action: 'keyword_data_fetched';
   data: KeywordData;

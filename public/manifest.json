@@ -28,13 +28,21 @@
     {
       "matches": ["<all_urls>"],
       "js": ["src/content.tsx"]
+    },
+    {
+      "matches": [
+        "*://sem.3ue.co/analytics/traffic/subfolders-subdomains*",
+        "*://sem.3ue.co/*/analytics/traffic/subfolders-subdomains*"
+      ],
+      "js": ["src/content_subdomain_scraper.ts"],
+      "run_at": "document_idle"
     }
   ],
   "permissions": [
     "storage",
-    "activeTab",
+    "tabs",
     "scripting",
-    "tabs"
+    "activeTab"
   ],
   "host_permissions": [
     "<all_urls>"

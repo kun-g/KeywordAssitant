@@ -2,6 +2,7 @@ import { useState, useEffect, StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import '../styles/globals.css';
 import { PlatformType, KeywordData, Sim3ueKeywordData, SumrushKeywordData } from '../types/index';
+import SubdomainView from './SubdomainView';
 
 // 类型守卫函数，用于区分不同平台的数据
 function isSim3ueData(data: KeywordData): data is Sim3ueKeywordData {
@@ -12,6 +13,9 @@ function isSumrushData(data: KeywordData): data is SumrushKeywordData {
   return data.platform === 'sumrush';
 }
 
+// 定义视图类型
+type ViewType = 'main' | 'subdomain';
+
 const Popup = () => {
   const [platform, setPlatform] = useState<PlatformType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,11 +25,35 @@ const Popup = () => {
   const [fetchStatus, setFetchStatus] = useState<{success?: boolean; message?: string} | null>(null);
   const [keywordData, setKeywordData] = useState<KeywordData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [isSubdomainPage, setIsSubdomainPage] = useState(false);
+  
+  // 检测当前页面是否为子域名/子文件夹数据页面
+  const checkIfSubdomainPage = async () => {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab && activeTab.url) {
+        const isSubdomain = activeTab.url.includes('sem.3ue.co/analytics/traffic/subfolders-subdomains');
+        setIsSubdomainPage(isSubdomain);
+        
+        // 如果是子域名页面，直接切换到子域名视图
+        if (isSubdomain) {
+          setCurrentView('subdomain');
+        }
+      }
+    } catch (err) {
+      console.error('检查页面类型失败:', err);
+    }
+  };
   
   useEffect(() => {
     const getCurrentPlatform = async () => {
       try {
         setLoading(true);
+        
+        // 检查当前页面是否为子域名页面
+        await checkIfSubdomainPage();
+        
         // 获取当前标签页
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
@@ -74,9 +102,9 @@ const Popup = () => {
       setIsFetching(true);
       setFetchStatus(null);
       setKeywordData(null);
-      
+
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
+
       if (!activeTab || !activeTab.id) {
         throw new Error('无法获取当前标签页');
       }
@@ -84,9 +112,9 @@ const Popup = () => {
       // 发送消息触发关键词数据抓取
       chrome.tabs.sendMessage(activeTab.id, { action: 'fetch_keyword_data' }, (response) => {
         if (chrome.runtime.lastError) {
-          setFetchStatus({ 
-            success: false, 
-            message: chrome.runtime.lastError.message || '抓取失败：内容脚本未响应' 
+          setFetchStatus({
+            success: false,
+            message: chrome.runtime.lastError.message || '抓取失败：内容脚本未响应'
           });
           setIsFetching(false);
           return;
@@ -114,6 +142,33 @@ const Popup = () => {
         message: err instanceof Error ? err.message : '未知错误'
       });
       setIsFetching(false);
+    }
+  };
+
+  // 手动抓取子域名/子文件夹数据
+  const fetchSubdomainData = async () => {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      if (!activeTab || !activeTab.id) {
+        throw new Error('无法获取当前标签页');
+      }
+      
+      // 发送消息触发子域名/子文件夹数据抓取
+      chrome.tabs.sendMessage(activeTab.id, { action: 'manual_scrape_subdomains' }, (response) => {
+        if (chrome.runtime.lastError) {
+          alert('抓取失败：' + (chrome.runtime.lastError.message || '内容脚本未响应'));
+          return;
+        }
+        
+        if (response && response.success) {
+          alert(`成功抓取 ${response.count} 条子域名/子文件夹数据`);
+        } else {
+          alert('抓取失败：' + (response?.error || '未知错误'));
+        }
+      });
+    } catch (err) {
+      alert('抓取失败：' + (err instanceof Error ? err.message : '未知错误'));
     }
   };
 
@@ -227,370 +282,405 @@ const Popup = () => {
     }
   };
 
-  // 通用的头部部分
+  // 渲染页头
   const renderHeader = () => {
-    if (!keywordData) return null;
-    
     return (
-      <div className="bg-gray-100 px-3 py-2 font-medium border-b border-gray-200 flex justify-between items-center">
-        <div>关键词数据：{keywordData.keyword}</div>
-        <button
-          className={`text-xs px-2 py-1 rounded text-white ${isSaving ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}
-          onClick={saveKeywordData}
-          disabled={isSaving}
-        >
-          {isSaving ? '保存中...' : '保存JSON'}
-        </button>
+      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center">
+          <h1 className="text-lg font-semibold mr-2">KeywordAssistant</h1>
+          {platform && (
+            <span className={`text-xs px-2 py-0.5 rounded-full text-white ${getPlatformBadgeClass(platform)}`}>
+              {getPlatformName(platform)}
+            </span>
+          )}
+        </div>
+        <div className="flex space-x-2">
+          {!isSubdomainPage && (
+            <button
+              className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded"
+              onClick={() => setCurrentView('subdomain')}
+            >
+              子域名数据
+            </button>
+          )}
+        </div>
       </div>
     );
   };
-  
-  // 通用的趋势图部分
+
+  // 渲染趋势图
   const renderTrends = () => {
-    if (!keywordData || !keywordData.trends || !keywordData.trends.chartUrl) return null;
+    if (!keywordData || !keywordData.trends || !keywordData.trends.chartUrl) {
+      return null;
+    }
     
     return (
-      <div className="mt-3">
-        <h3 className="font-medium mb-1">动态趋势</h3>
-        <div className="flex flex-col">
+      <div className="p-4 border-b">
+        <h3 className="text-sm font-medium mb-2">搜索趋势</h3>
+        <div className="bg-gray-50 p-2 rounded">
           <img 
             src={keywordData.trends.chartUrl} 
-            alt="趋势图" 
-            className="w-full border border-gray-200 rounded"
+            alt="Search Trend" 
+            className="w-full h-auto"
           />
         </div>
       </div>
     );
   };
 
-  // 根据平台类型渲染不同的关键词数据
+  // 渲染关键词数据
   const renderKeywordData = () => {
-    if (!keywordData) return null;
+    if (!keywordData) {
+      return null;
+    }
     
-    // Sim3ue平台特有的数据展示
+    // 根据平台类型渲染不同的数据
     if (isSim3ueData(keywordData)) {
       return (
-        <div className="mt-4 border border-gray-200 rounded-md overflow-hidden">
-          {renderHeader()}
-          <div className="p-3 text-sm">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col">
-                <span className="text-gray-600">搜索量：</span>
-                <span className="font-medium">{formatValue(keywordData.volume)}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-gray-600">点击量：</span>
-                <span className="font-medium">{formatValue(keywordData.clicks)}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-gray-600">点击率：</span>
-                <span className="font-medium">{formatValue(keywordData.clickThroughRate)}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-gray-600">难度：</span>
-                <span className="font-medium">{formatValue(keywordData.difficulty)}</span>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">搜索量</h3>
+              <p className="text-lg font-semibold">{keywordData.volume}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">点击量</h3>
+              <p className="text-lg font-semibold">{keywordData.clicks}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">点击率</h3>
+              <p className="text-lg font-semibold">{keywordData.clickThroughRate}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">难度</h3>
+              <p className="text-lg font-semibold">{keywordData.difficulty}</p>
+            </div>
+          </div>
+          
+          {keywordData.devices && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">设备分布</h3>
+              <div className="flex gap-4">
+                <div className="bg-gray-50 p-3 rounded flex-1">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">桌面端</h4>
+                  <p className="text-lg font-semibold">{keywordData.devices.desktop}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded flex-1">
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">移动端</h4>
+                  <p className="text-lg font-semibold">{keywordData.devices.mobile}</p>
+                </div>
               </div>
             </div>
-            
-            {keywordData.devices && (
-              <div className="mt-3">
-                <h3 className="font-medium mb-1">设备分布</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col">
-                    <span className="text-gray-600">桌面端：</span>
-                    <span className="font-medium">{formatValue(keywordData.devices.desktop)}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-gray-600">移动端：</span>
-                    <span className="font-medium">{formatValue(keywordData.devices.mobile)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {renderTrends()}
-            
-            {/* 头部网站 */}
-            {keywordData.topCompetitors && keywordData.topCompetitors.length > 0 && (
-              <div className="mt-3">
-                <h3 className="font-medium mb-1">头部网站</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">网站</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">点击量</th>
+          )}
+          
+          {keywordData.relatedKeywords && keywordData.relatedKeywords.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">相关关键词</h3>
+              <div className="bg-gray-50 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">关键词</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">搜索量</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">点击率</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">难度</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {keywordData.relatedKeywords.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 text-xs">{item.keyword}</td>
+                        <td className="px-3 py-2 text-xs">{item.volume}</td>
+                        <td className="px-3 py-2 text-xs">{item.clickThroughRate}</td>
+                        <td className="px-3 py-2 text-xs">{item.kd}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {keywordData.topCompetitors.map((competitor, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="text-xs p-2 border border-gray-200">{competitor.website}</td>
-                          <td className="text-xs p-2 border border-gray-200">{competitor.clicks}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-            
-            {/* 相关关键词（带数据） */}
-            {keywordData.relatedKeywords && keywordData.relatedKeywords.length > 0 && (
-              <div className="mt-3">
-                <h3 className="font-medium mb-1">相关关键词</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">关键词</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">搜索量</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">零点击率</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">KD</th>
+            </div>
+          )}
+          
+          {keywordData.topCompetitors && keywordData.topCompetitors.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">主要竞争对手</h3>
+              <div className="bg-gray-50 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">网站</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">点击量</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {keywordData.topCompetitors.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 text-xs">{item.website}</td>
+                        <td className="px-3 py-2 text-xs">{item.clicks}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {keywordData.relatedKeywords.slice(0, 5).map((relatedKeyword, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="text-xs p-2 border border-gray-200">{relatedKeyword.keyword}</td>
-                          <td className="text-xs p-2 border border-gray-200">{relatedKeyword.volume}</td>
-                          <td className="text-xs p-2 border border-gray-200">{relatedKeyword.clickThroughRate}</td>
-                          <td className="text-xs p-2 border border-gray-200">{relatedKeyword.kd}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {keywordData.relatedKeywords.length > 5 && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      显示前5个，共 {keywordData.relatedKeywords.length} 个相关词
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    } else if (isSumrushData(keywordData)) {
+      return (
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-3 rounded">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">搜索量</h3>
+              <p className="text-lg font-semibold">{keywordData.volume}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded">
+              <h3 className="text-xs font-medium text-gray-500 mb-1">难度</h3>
+              <p className="text-lg font-semibold">{keywordData.difficulty}</p>
+            </div>
+          </div>
+          
+          {keywordData.region && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">地区</h3>
+              <div className="bg-gray-50 p-3 rounded">
+                <p className="text-base">{keywordData.region.name} ({keywordData.region.code})</p>
+              </div>
+            </div>
+          )}
+          
+          {keywordData.countryDistribution && Object.keys(keywordData.countryDistribution).length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">国家分布</h3>
+              <div className="bg-gray-50 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">国家</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">搜索量</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {Object.entries(keywordData.countryDistribution).map(([country, volume], index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 text-xs">{country}</td>
+                        <td className="px-3 py-2 text-xs">{volume}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          
+          {keywordData.relatedKeywords && keywordData.relatedKeywords.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">相关关键词</h3>
+              <div className="bg-gray-50 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">关键词</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">搜索量</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">难度</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {keywordData.relatedKeywords.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 text-xs">{item.keyword}</td>
+                        <td className="px-3 py-2 text-xs">{item.volume}</td>
+                        <td className="px-3 py-2 text-xs">{item.difficulty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          
+          {keywordData.topCompetitors && keywordData.topCompetitors.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">主要竞争对手</h3>
+              <div className="bg-gray-50 rounded overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">网站</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">流量</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {keywordData.topCompetitors.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-3 py-2 text-xs">{item.website}</td>
+                        <td className="px-3 py-2 text-xs">{item.traffic}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      // 通用关键词数据显示
+      return (
+        <div className="p-4">
+          <div className="bg-gray-50 p-4 rounded">
+            <h3 className="text-sm font-medium mb-2">关键词数据</h3>
+            <div className="space-y-2">
+              {Object.entries(keywordData).map(([key, value]) => {
+                if (key !== 'platform' && key !== 'captured_at' && key !== 'source_url') {
+                  return (
+                    <div key={key} className="flex">
+                      <span className="text-xs font-medium text-gray-500 w-1/3">{key}:</span>
+                      <span className="text-xs flex-1">{formatValue(value)}</span>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  );
+                }
+                return null;
+              })}
+            </div>
           </div>
         </div>
       );
     }
-    
-    // Sumrush平台特有的数据展示
-    if (isSumrushData(keywordData)) {
+  };
+
+  // 渲染主视图
+  const renderMainView = () => {
+    if (loading) {
       return (
-        <div className="mt-4 border border-gray-200 rounded-md overflow-hidden">
-          {renderHeader()}
-          <div className="p-3 text-sm">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col">
-                <span className="text-gray-600">搜索量：</span>
-                <span className="font-medium">{formatValue(keywordData.volume)}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-gray-600">难度：</span>
-                <span className="font-medium">{formatValue(keywordData.difficulty)}%</span>
-              </div>
-              {keywordData.region && (
-                <div className="flex flex-col col-span-2">
-                  <span className="text-gray-600">地区：</span>
-                  <span className="font-medium">
-                    {keywordData.region.name} ({keywordData.region.code})
-                  </span>
-                </div>
+        <div className="flex flex-col items-center justify-center h-full p-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mb-4"></div>
+          <p className="text-gray-600">正在识别当前页面...</p>
+        </div>
+      );
+    }
+    
+    if (error) {
+      return (
+        <div className="p-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p>{error}</p>
+          </div>
+          <p className="text-sm text-gray-600">
+            请确保您正在访问支持的平台页面，或者刷新页面后重试。
+          </p>
+        </div>
+      );
+    }
+    
+    // 检查是否为子域名/子文件夹页面
+    if (platform === 'sim3ue' && isSubdomainPage) {
+      return (
+        <div className="p-4">
+          <div className="bg-blue-100 border border-blue-300 text-blue-800 px-4 py-3 rounded mb-4">
+            <p>检测到当前页面为子域名/子文件夹数据页面</p>
+          </div>
+          
+          <button
+            className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded mb-4"
+            onClick={fetchSubdomainData}
+          >
+            抓取子域名/子文件夹数据
+          </button>
+          
+          <p className="text-sm text-gray-600">
+            点击上方按钮抓取当前页面的子域名/子文件夹数据。
+          </p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex flex-col h-full">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">关键词数据</h2>
+              {keyword && (
+                <p className="text-sm text-gray-600">
+                  当前关键词: <span className="font-medium">{keyword}</span>
+                </p>
               )}
             </div>
             
-            {/* 国家分布数据 */}
-            {Object.keys(keywordData.countryDistribution).length > 0 && (
-              <div className="mt-3">
-                <h3 className="font-medium mb-1">国家分布</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">国家</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">搜索量</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(keywordData.countryDistribution).map(([countryCode, volume], index) => (
-                        <tr key={countryCode} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="text-xs p-2 border border-gray-200">{countryCode}</td>
-                          <td className="text-xs p-2 border border-gray-200">{volume}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            
-            {renderTrends()}
-            
-            {/* 头部网站 */}
-            {keywordData.topCompetitors && keywordData.topCompetitors.length > 0 && (
-              <div className="mt-3">
-                <h3 className="font-medium mb-1">头部网站</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">网站</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">流量</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {keywordData.topCompetitors.map((competitor, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="text-xs p-2 border border-gray-200">{competitor.website}</td>
-                          <td className="text-xs p-2 border border-gray-200">{competitor.traffic}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            
-            {/* 相关关键词 */}
-            {keywordData.relatedKeywords && keywordData.relatedKeywords.length > 0 && (
-              <div className="mt-3">
-                <h3 className="font-medium mb-1">相关关键词</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">关键词</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">搜索量</th>
-                        <th className="bg-gray-50 text-left text-xs p-2 border border-gray-200">难度</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {keywordData.relatedKeywords.slice(0, 5).map((relatedKeyword, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="text-xs p-2 border border-gray-200">{relatedKeyword.keyword}</td>
-                          <td className="text-xs p-2 border border-gray-200">{relatedKeyword.volume}</td>
-                          <td className="text-xs p-2 border border-gray-200">
-                            {typeof relatedKeyword.difficulty === 'number' 
-                              ? `${relatedKeyword.difficulty}%` 
-                              : '未知'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {keywordData.relatedKeywords.length > 5 && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      显示前5个，共 {keywordData.relatedKeywords.length} 个相关词
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-    
-    // 默认数据展示（其他平台）
-    return (
-      <div className="mt-4 border border-gray-200 rounded-md overflow-hidden">
-        {renderHeader()}
-        <div className="p-3 text-sm">
-          <div className="grid grid-cols-2 gap-2">
-            {Object.entries(keywordData).map(([key, value]) => {
-              // 跳过复杂对象和数组，只显示简单值
-              if (typeof value === 'object' && value !== null) return null;
-              if (key === 'platform' || key === 'captured_at' || key === 'source_url') return null;
-              
-              return (
-                <div key={key} className="flex flex-col">
-                  <span className="text-gray-600">{key}：</span>
-                  <span className="font-medium">{formatValue(value)}</span>
-                </div>
-              );
-            })}
+            <button
+              className={`px-4 py-2 rounded ${
+                isFetching
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+              onClick={fetchKeywordData}
+              disabled={isFetching}
+            >
+              {isFetching ? '抓取中...' : '抓取数据'}
+            </button>
           </div>
           
-          {renderTrends()}
+          {fetchStatus && (
+            <div className={`p-3 rounded mb-4 ${
+              fetchStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              <p>{fetchStatus.message}</p>
+            </div>
+          )}
         </div>
+        
+        {keywordData && (
+          <>
+            {renderTrends()}
+            {renderKeywordData()}
+            
+            <div className="p-4 border-t mt-auto">
+              <button
+                className={`w-full py-2 px-4 rounded ${
+                  isSaving
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+                }`}
+                onClick={saveKeywordData}
+                disabled={isSaving}
+              >
+                {isSaving ? '导出中...' : '导出JSON'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     );
   };
 
+  // 根据当前视图渲染不同的内容
+  const renderContent = () => {
+    switch (currentView) {
+      case 'subdomain':
+        return <SubdomainView onBack={() => setCurrentView('main')} />;
+      case 'main':
+      default:
+        return renderMainView();
+    }
+  };
+
   return (
-    <div className="w-96 p-4">
-      <header className="mb-4">
-        <h1 className="text-xl font-bold">KeywordAssistant</h1>
-        
-        <div className="mt-2">
-          <span className="text-sm text-gray-600">当前平台：</span>
-          {loading ? (
-            <span className="ml-1 text-sm">加载中...</span>
-          ) : error ? (
-            <span className="ml-1 text-sm text-red-500">{error}</span>
-          ) : (
-            <span 
-              className={`ml-1 px-2 py-1 text-xs rounded-full text-white ${getPlatformBadgeClass(platform)}`}
-            >
-              {getPlatformName(platform)}
-            </span>
-          )}
-        </div>
-      </header>
-      
-      {/* 关键词抓取区域 */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-md">
-        <h2 className="text-md font-semibold mb-2">关键词数据工具</h2>
-        
-        {(platform === 'sim3ue' || platform === 'sumrush') && keyword && (
-          <div className="mb-2">
-            <span className="text-sm text-gray-600">检测到关键词：</span>
-            <span className="font-medium">{keyword}</span>
-          </div>
-        )}
-        
-        <button
-          className={`w-full py-2 px-4 rounded-md text-white font-medium ${
-            isFetching 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : platform === 'sim3ue' 
-                ? 'bg-purple-600 hover:bg-purple-700'
-                : platform === 'sumrush'
-                  ? 'bg-orange-600 hover:bg-orange-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-          onClick={fetchKeywordData}
-          disabled={isFetching}
-        >
-          {isFetching 
-            ? '抓取中...' 
-            : (platform === 'sim3ue' || platform === 'sumrush') && keyword 
-              ? `抓取"${keyword}"数据` 
-              : '抓取页面数据'
-          }
-        </button>
-        
-        {fetchStatus && (
-          <div className={`mt-2 p-2 text-sm rounded ${
-            fetchStatus.success 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {fetchStatus.message}
-          </div>
-        )}
-        
-        {/* 使用新的renderKeywordData函数显示抓取到的关键词数据 */}
-        {keywordData && renderKeywordData()}
-      </div>
+    <div className="flex flex-col h-[600px] w-[400px] overflow-hidden">
+      {renderHeader()}
+      {renderContent()}
     </div>
   );
 };
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(
-  <StrictMode>
-    <Popup />
-  </StrictMode>
-);
+// 渲染应用
+const root = document.getElementById('root');
+if (root) {
+  ReactDOM.createRoot(root).render(
+    <StrictMode>
+      <Popup />
+    </StrictMode>
+  );
+}
 
 export default Popup; 

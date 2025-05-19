@@ -32,13 +32,21 @@
       "js": [
         "src/content.tsx-loader.js"
       ]
+    },
+    {
+      "matches": [
+        "*://sem.3ue.co/*"
+      ],
+      "js": [
+        "src/content_subdomain_scraper.ts-loader.js"
+      ]
     }
   ],
   "permissions": [
     "storage",
-    "activeTab",
+    "tabs",
     "scripting",
-    "tabs"
+    "activeTab"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -1,5 +1,15 @@
 // KeywordAssistant - 后台服务脚本
-import { KeywordData, MessagePayload } from './types';
+import { KeywordData, MessagePayload, SubdomainData } from './types';
+import { addSubdomainsBatch } from './utils/storage';
+
+// 调试日志功能
+const DEBUG = true; // 调试开关，发布时可设为false
+
+function debugLog(...args: any[]) {
+  if (DEBUG) {
+    console.log('[DEBUG][BackgroundScript]', ...args);
+  }
+}
 
 // 初始化存储
 const initStorage = async () => {
@@ -11,118 +21,170 @@ const initStorage = async () => {
       tags: [],
       industry: ''
     },
-    keywords: []
+    keywords: [],
+    subdomains: []
   };
 
   try {
+    debugLog('开始初始化存储...');
     const { backlinks } = await chrome.storage.local.get('backlinks');
     const { site_config } = await chrome.storage.local.get('site_config');
     const { keywords } = await chrome.storage.local.get('keywords');
+    const { subdomains } = await chrome.storage.local.get('subdomains');
 
     if (!backlinks) {
       await chrome.storage.local.set({ backlinks: defaultStorage.backlinks });
+      debugLog('初始化backlinks存储');
     }
 
     if (!site_config) {
       await chrome.storage.local.set({ site_config: defaultStorage.site_config });
+      debugLog('初始化site_config存储');
     }
 
     if (!keywords) {
       await chrome.storage.local.set({ keywords: defaultStorage.keywords });
+      debugLog('初始化keywords存储');
+    }
+
+    if (!subdomains) {
+      await chrome.storage.local.set({ subdomains: defaultStorage.subdomains });
+      debugLog('初始化subdomains存储');
     }
 
     console.log('KeywordAssistant 插件存储已初始化');
+    debugLog('存储初始化完成');
   } catch (error) {
     console.error('KeywordAssistant 插件存储初始化失败:', error);
+    debugLog('存储初始化失败:', error);
   }
 };
 
-// 保存关键词数据
-const saveKeywordData = async (keywordData: KeywordData): Promise<boolean> => {
-  try {
-    // 添加时间戳
-    const enrichedData = {
-      ...keywordData,
-      captured_at: Date.now(),
-      source_url: keywordData.source_url || window.location.href
-    };
+// 监听来自内容脚本的消息
+chrome.runtime.onMessage.addListener((message: MessagePayload, sender, sendResponse) => {
+  debugLog('收到消息:', message, '来源:', sender);
+  
+  // 处理关键词数据
+  if (message.action === 'keyword_data_fetched') {
+    debugLog('收到关键词数据:', message.data);
+    // 将关键词数据保存到存储中
+    handleKeywordData(message.data as KeywordData)
+      .then(() => {
+        debugLog('关键词数据处理成功');
+        sendResponse({ success: true });
+      })
+      .catch((error) => {
+        console.error('处理关键词数据失败:', error);
+        debugLog('关键词数据处理失败:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // 异步响应
+  }
+  
+  // 处理子域名/子文件夹数据
+  if (message.action === 'subdomain_data_fetched') {
+    debugLog('收到子域名数据:', message.data);
+    // 将子域名/子文件夹数据保存到存储中
+    handleSubdomainData(message.data as SubdomainData[])
+      .then((count) => {
+        debugLog('子域名数据处理成功, 数量:', count);
+        sendResponse({ success: true, count });
+      })
+      .catch((error) => {
+        console.error('处理子域名/子文件夹数据失败:', error);
+        debugLog('子域名数据处理失败:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // 异步响应
+  }
+  
+  // 获取所有子域名/子文件夹数据
+  if (message.action === 'get_all_subdomains') {
+    debugLog('收到获取所有子域名数据请求');
+    getAllSubdomains()
+      .then((data) => {
+        debugLog('成功获取子域名数据, 数量:', data.length);
+        sendResponse({ success: true, data });
+      })
+      .catch((error) => {
+        console.error('获取子域名/子文件夹数据失败:', error);
+        debugLog('获取子域名数据失败:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // 异步响应
+  }
+  
+  debugLog('未处理的消息类型:', message.action);
+});
 
+// 处理关键词数据
+const handleKeywordData = async (keywordData: KeywordData): Promise<void> => {
+  try {
+    debugLog('处理关键词数据:', keywordData.keyword);
     // 获取现有关键词数据
     const { keywords = [] } = await chrome.storage.local.get('keywords');
     
-    // 检查是否已存在相同关键词数据
-    const existingIndex = keywords.findIndex(
-      (k: KeywordData) => k.keyword === keywordData.keyword
+    // 检查是否已存在相同关键词的数据
+    const existingIndex = keywords.findIndex((item: KeywordData) => 
+      item.keyword === keywordData.keyword && item.platform === keywordData.platform
     );
     
     if (existingIndex >= 0) {
       // 更新现有数据
-      keywords[existingIndex] = enrichedData;
+      debugLog('更新现有关键词数据');
+      keywords[existingIndex] = keywordData;
     } else {
       // 添加新数据
-      keywords.push(enrichedData);
+      debugLog('添加新关键词数据');
+      keywords.push(keywordData);
     }
     
-    // 保存到本地存储
+    // 保存更新后的数据
     await chrome.storage.local.set({ keywords });
-    console.log('关键词数据已保存:', enrichedData);
     
-    return true;
+    console.log('关键词数据已保存:', keywordData.keyword);
+    debugLog('关键词数据已保存成功');
   } catch (error) {
     console.error('保存关键词数据失败:', error);
-    return false;
+    debugLog('保存关键词数据失败:', error);
+    throw error;
   }
 };
 
-// 监听来自popup或content scripts的消息
-chrome.runtime.onMessage.addListener((message: MessagePayload, _sender, sendResponse) => {
-  console.log('接收到消息:', message);
-
-  switch (message.action) {
-    case 'submit_link':
-      // 简化版本，仅用于开发测试
-      sendResponse({ success: true });
-      return true;
-
-    case 'link_submitted':
-      // 简化版本，仅用于开发测试
-      console.log('链接提交结果:', message.data);
-      sendResponse({ success: true });
-      return true;
-      
-    case 'keyword_data_fetched':
-      // 处理从内容脚本获取的关键词数据
-      saveKeywordData(message.data)
-        .then(success => {
-          sendResponse({ success });
-        })
-        .catch(error => {
-          console.error('保存关键词数据时出错:', error);
-          sendResponse({ success: false, error: error.message });
-        });
-      return true; // 异步响应
-
-    case 'get_all_keywords':
-      // 获取所有已保存的关键词数据
-      chrome.storage.local.get('keywords')
-        .then(({ keywords = [] }) => {
-          sendResponse({ success: true, data: keywords });
-        })
-        .catch(error => {
-          console.error('获取关键词数据失败:', error);
-          sendResponse({ success: false, error: error.message });
-        });
-      return true; // 异步响应
-
-    default:
-      console.log('未知操作:', message.action);
-      sendResponse({ success: false, error: '未知操作' });
+// 处理子域名/子文件夹数据
+const handleSubdomainData = async (subdomainData: SubdomainData[]): Promise<number> => {
+  try {
+    debugLog(`处理${subdomainData.length}条子域名数据`);
+    // 将数据批量添加到存储中
+    const result = await addSubdomainsBatch(subdomainData);
+    debugLog('子域名数据处理结果:', result);
+    return subdomainData.length;
+  } catch (error) {
+    console.error('保存子域名/子文件夹数据失败:', error);
+    debugLog('保存子域名数据失败:', error);
+    throw error;
   }
-});
+};
+
+// 获取所有子域名/子文件夹数据
+const getAllSubdomains = async (): Promise<SubdomainData[]> => {
+  try {
+    debugLog('获取所有子域名数据');
+    const { subdomains = [] } = await chrome.storage.local.get('subdomains');
+    debugLog(`获取到${subdomains.length}条子域名数据`);
+    return subdomains;
+  } catch (error) {
+    console.error('获取子域名/子文件夹数据失败:', error);
+    debugLog('获取子域名数据失败:', error);
+    throw error;
+  }
+};
 
 // 插件安装或更新时初始化存储
 chrome.runtime.onInstalled.addListener(() => {
+  debugLog('插件已安装或更新，初始化存储');
   initStorage();
 });
 
-console.log('KeywordAssistant 背景服务已启动'); 
+console.log('KeywordAssistant 背景服务已启动');
+debugLog('背景服务已启动'); 
